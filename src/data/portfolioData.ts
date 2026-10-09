@@ -85,7 +85,7 @@ export const ARTIST_PROFILE = {
   socials: {
     behance: 'https://www.behance.net/tsam_dzn',
     discord: 'saify_samit',
-    instagram: 'https://www.instagram.com/tsam_dzn/',
+    instagram: 'https://www.instagram.com/saify_samit/',
     linkedin: 'https://www.linkedin.com/in/saifysamit',
     whatsapp: 'https://wa.me/?text=Hi%20Saify,%20I%20saw%20your%20portfolio%20and%20would%20like%20to%20discuss%20a%20commercial%20design%20project.',
   },

@@ -124,7 +124,18 @@ export default function Footer() {
           </div>
 
           <div className="flex items-center gap-2 text-zinc-500">
-            <span>© 2026 Saify Samit. All rights reserved.</span>
+            <span>
+              © 2026{' '}
+              <a
+                href="https://www.instagram.com/saify_samit/"
+                target="_blank"
+                rel="noreferrer"
+                className="text-zinc-400 hover:text-[#FF4655] underline-offset-4 hover:underline transition-colors font-medium"
+              >
+                Saify Samit
+              </a>
+              . All rights reserved.
+            </span>
             {isAdmin && (
               <button
                 onClick={openAccessModal}

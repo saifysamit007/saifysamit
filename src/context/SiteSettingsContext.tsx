@@ -54,11 +54,148 @@ export const SECTION_METADATA: Record<
 export const DEFAULT_FAVICON_SVG =
   "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0e14'/><path d='M10 23V9h4.5a4.5 4.5 0 0 1 3.2 1.3A4.5 4.5 0 0 1 19 13.5c0 1.2-.4 2.2-1.2 3A4.5 4.5 0 0 1 21 20.5c0 1.3-.5 2.4-1.4 3.3-.9.9-2 1.2-3.3 1.2H10zm3-8.5h1.8c.6 0 1.1-.2 1.5-.6.4-.4.6-.9.6-1.4 0-.6-.2-1.1-.6-1.5-.4-.4-.9-.5-1.5-.5H13v4zm0 6h2.2c.7 0 1.3-.2 1.7-.7.4-.4.7-1 .7-1.6 0-.6-.2-1.2-.7-1.6-.4-.4-1-.7-1.7-.7H13v4.6z' fill='%23FF4655'/></svg>";
 
+export type ThemePreset = 'crimson' | 'winter' | 'emerald' | 'gold' | 'violet' | 'custom';
+
+export interface ThemeConfig {
+  preset: ThemePreset;
+  primaryColor?: string;
+  primaryHover?: string;
+  glowColor?: string;
+  bgBase?: string;
+  surfaceColor?: string;
+  borderColor?: string;
+  winterSnowEnabled?: boolean;
+  winterFrostVignette?: boolean;
+  winterSnowIntensity?: 'subtle' | 'moderate' | 'blizzard';
+}
+
+export const THEME_PRESETS: Record<
+  ThemePreset,
+  {
+    name: string;
+    tagline: string;
+    badge: string;
+    primaryColor: string;
+    primaryHover: string;
+    glowColor: string;
+    bgBase: string;
+    surfaceColor: string;
+    borderColor: string;
+  }
+> = {
+  crimson: {
+    name: 'Crimson Protocol',
+    tagline: 'Signature Valorant Red & Shadow Onyx',
+    badge: 'Original Edition',
+    primaryColor: '#FF4655',
+    primaryHover: '#ff5e6c',
+    glowColor: 'rgba(255, 70, 85, 0.45)',
+    bgBase: '#080B0F',
+    surfaceColor: '#0E141B',
+    borderColor: '#1F2833',
+  },
+  winter: {
+    name: 'Winter Frost',
+    tagline: 'Chilled Glacier Cyan, Falling Snow & Crystals',
+    badge: 'Seasonal Edition',
+    primaryColor: '#38bdf8',
+    primaryHover: '#0ea5e9',
+    glowColor: 'rgba(56, 189, 248, 0.45)',
+    bgBase: '#050c18',
+    surfaceColor: '#0c192c',
+    borderColor: '#1e3a5f',
+  },
+  emerald: {
+    name: 'Cyberpunk Jade',
+    tagline: 'Vibrant Neo-Tokyo Emerald & Hyper-Black',
+    badge: 'Esports Edition',
+    primaryColor: '#10b981',
+    primaryHover: '#059669',
+    glowColor: 'rgba(16, 185, 129, 0.45)',
+    bgBase: '#050d0a',
+    surfaceColor: '#0c1a14',
+    borderColor: '#143828',
+  },
+  gold: {
+    name: 'Imperial Sovereign',
+    tagline: 'Executive Champagne Gold & Obsidian Luxury',
+    badge: 'Commercial Edition',
+    primaryColor: '#f59e0b',
+    primaryHover: '#d97706',
+    glowColor: 'rgba(245, 158, 11, 0.45)',
+    bgBase: '#0c0a06',
+    surfaceColor: '#18140c',
+    borderColor: '#382d18',
+  },
+  violet: {
+    name: 'Neon Violet Void',
+    tagline: 'Arcane Electric Purple & Deep Space Twilight',
+    badge: 'Creative Edition',
+    primaryColor: '#a855f7',
+    primaryHover: '#9333ea',
+    glowColor: 'rgba(168, 85, 247, 0.45)',
+    bgBase: '#0b0612',
+    surfaceColor: '#160d24',
+    borderColor: '#301b4e',
+  },
+  custom: {
+    name: 'Custom Accent',
+    tagline: 'Bespoke Palette Engineered by Saify',
+    badge: 'Custom',
+    primaryColor: '#FF4655',
+    primaryHover: '#ff5e6c',
+    glowColor: 'rgba(255, 70, 85, 0.45)',
+    bgBase: '#080B0F',
+    surfaceColor: '#0E141B',
+    borderColor: '#1F2833',
+  },
+};
+
+export const DEFAULT_THEME_CONFIG: ThemeConfig = {
+  preset: 'crimson',
+  primaryColor: '#FF4655',
+  primaryHover: '#ff5e6c',
+  glowColor: 'rgba(255, 70, 85, 0.45)',
+  bgBase: '#080B0F',
+  surfaceColor: '#0E141B',
+  borderColor: '#1F2833',
+  winterSnowEnabled: true,
+  winterFrostVignette: true,
+  winterSnowIntensity: 'moderate',
+};
+
+export interface SiteCopyConfig {
+  heroBadge?: string;
+  heroHeadline?: string;
+  heroHighlightText?: string;
+  heroDescription?: string;
+  heroCtaWork?: string;
+  heroCtaContact?: string;
+  artistTitle?: string;
+  contactHeadline?: string;
+  contactSubtitle?: string;
+}
+
+export const DEFAULT_SITE_COPY: SiteCopyConfig = {
+  heroBadge: 'Commercial & Esports Graphics Artist',
+  heroHeadline: 'Visuals built to make brands',
+  heroHighlightText: 'impossible to ignore.',
+  heroDescription:
+    'Commercial visual identity, esports branding, and premium motion graphics crafted for tier-one creators, gaming organizations, and ambitious modern brands.',
+  heroCtaWork: 'Explore Selected Work',
+  heroCtaContact: 'Commission a Project',
+  artistTitle: 'Graphics Artist & Visual Designer',
+  contactHeadline: "Let's build something exceptional together.",
+  contactSubtitle: 'Have a project, campaign, or rebrand in mind? Send your project brief directly.',
+};
+
 export interface SiteSettings {
   maintenanceMode: boolean;
   maintenanceMessage: string;
   faviconUrl?: string | null;
   preloaderEnabled: boolean;
+  theme: ThemeConfig;
+  customCopy: SiteCopyConfig;
   sectionVisibility: Record<SectionKey, boolean>;
 }
 
@@ -68,6 +205,8 @@ const DEFAULT_SETTINGS: SiteSettings = {
     "Scheduled visual upgrades and system maintenance underway. Saify Samit is updating the portfolio with new commercial projects. We'll be back shortly.",
   faviconUrl: null,
   preloaderEnabled: true,
+  theme: DEFAULT_THEME_CONFIG,
+  customCopy: DEFAULT_SITE_COPY,
   sectionVisibility: {
     hero: true,
     work: true,
@@ -97,6 +236,14 @@ interface SiteSettingsContextType {
   isFaviconModalOpen: boolean;
   openFaviconModal: () => void;
   closeFaviconModal: () => void;
+  isCustomizerOpen: boolean;
+  openCustomizer: () => void;
+  closeCustomizer: () => void;
+  setThemePreset: (preset: ThemePreset, customPrimaryColor?: string) => Promise<boolean>;
+  updateTheme: (updates: Partial<ThemeConfig>) => Promise<boolean>;
+  updateCustomCopy: (copy: Partial<SiteCopyConfig>) => Promise<boolean>;
+  resetThemeToDefault: () => Promise<boolean>;
+  resetCopyToDefault: () => Promise<boolean>;
 }
 
 const SiteSettingsContext = createContext<SiteSettingsContextType | undefined>(undefined);
@@ -116,6 +263,8 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
           faviconUrl: parsed.faviconUrl !== undefined ? parsed.faviconUrl : null,
           preloaderEnabled:
             parsed.preloaderEnabled !== undefined ? Boolean(parsed.preloaderEnabled) : true,
+          theme: { ...DEFAULT_THEME_CONFIG, ...(parsed.theme || {}) },
+          customCopy: { ...DEFAULT_SITE_COPY, ...(parsed.customCopy || {}) },
           sectionVisibility: {
             ...DEFAULT_SETTINGS.sectionVisibility,
             ...(parsed.sectionVisibility || {}),
@@ -129,6 +278,7 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [isLoading, setIsLoading] = useState(true);
   const [isSectionManagerOpen, setIsSectionManagerOpen] = useState(false);
   const [isFaviconModalOpen, setIsFaviconModalOpen] = useState(false);
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false);
 
   // Sync from server on mount
   useEffect(() => {
@@ -146,6 +296,8 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
               data.settings.preloaderEnabled !== undefined
                 ? Boolean(data.settings.preloaderEnabled)
                 : true,
+            theme: { ...DEFAULT_THEME_CONFIG, ...(data.settings.theme || {}) },
+            customCopy: { ...DEFAULT_SITE_COPY, ...(data.settings.customCopy || {}) },
             sectionVisibility: {
               ...DEFAULT_SETTINGS.sectionVisibility,
               ...(data.settings.sectionVisibility || {}),
@@ -180,11 +332,9 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     const faviconUrl = settings.faviconUrl || DEFAULT_FAVICON_SVG;
     try {
-      // Remove any existing icon tags
       const existingIcons = document.querySelectorAll("link[rel*='icon']");
       existingIcons.forEach((el) => el.remove());
 
-      // Create primary favicon link
       const link = document.createElement('link');
       link.id = 'app-favicon';
       link.rel = 'icon';
@@ -206,7 +356,6 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       link.href = faviconUrl;
       document.head.appendChild(link);
 
-      // Create Apple touch icon
       const appleLink = document.createElement('link');
       appleLink.rel = 'apple-touch-icon';
       appleLink.href = faviconUrl;
@@ -217,7 +366,6 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   }, [settings.faviconUrl]);
 
   const persistSettings = async (newSettings: SiteSettings): Promise<boolean> => {
-    // 1. Optimistic local state update
     setSettings(newSettings);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
@@ -226,7 +374,6 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       new CustomEvent('saify_site_settings_updated', { detail: newSettings })
     );
 
-    // 2. Persist to server if admin authenticated
     try {
       const response = await fetch('/api/site-settings', {
         method: 'POST',
@@ -307,6 +454,57 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return persistSettings(updatedSettings);
   };
 
+  const setThemePreset = async (preset: ThemePreset, customPrimaryColor?: string): Promise<boolean> => {
+    const presetData = THEME_PRESETS[preset] || THEME_PRESETS.crimson;
+    const newTheme: ThemeConfig = {
+      ...settings.theme,
+      preset,
+      primaryColor: customPrimaryColor || presetData.primaryColor,
+      primaryHover: presetData.primaryHover,
+      glowColor: presetData.glowColor,
+      bgBase: presetData.bgBase,
+      surfaceColor: presetData.surfaceColor,
+      borderColor: presetData.borderColor,
+    };
+    const updatedSettings: SiteSettings = {
+      ...settings,
+      theme: newTheme,
+    };
+    return persistSettings(updatedSettings);
+  };
+
+  const updateTheme = async (updates: Partial<ThemeConfig>): Promise<boolean> => {
+    const updatedSettings: SiteSettings = {
+      ...settings,
+      theme: { ...settings.theme, ...updates },
+    };
+    return persistSettings(updatedSettings);
+  };
+
+  const updateCustomCopy = async (copyUpdates: Partial<SiteCopyConfig>): Promise<boolean> => {
+    const updatedSettings: SiteSettings = {
+      ...settings,
+      customCopy: { ...settings.customCopy, ...copyUpdates },
+    };
+    return persistSettings(updatedSettings);
+  };
+
+  const resetThemeToDefault = async (): Promise<boolean> => {
+    const updatedSettings: SiteSettings = {
+      ...settings,
+      theme: { ...DEFAULT_THEME_CONFIG },
+    };
+    return persistSettings(updatedSettings);
+  };
+
+  const resetCopyToDefault = async (): Promise<boolean> => {
+    const updatedSettings: SiteSettings = {
+      ...settings,
+      customCopy: { ...DEFAULT_SITE_COPY },
+    };
+    return persistSettings(updatedSettings);
+  };
+
   return (
     <SiteSettingsContext.Provider
       value={{
@@ -327,6 +525,14 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
         isFaviconModalOpen,
         openFaviconModal: () => setIsFaviconModalOpen(true),
         closeFaviconModal: () => setIsFaviconModalOpen(false),
+        isCustomizerOpen,
+        openCustomizer: () => setIsCustomizerOpen(true),
+        closeCustomizer: () => setIsCustomizerOpen(false),
+        setThemePreset,
+        updateTheme,
+        updateCustomCopy,
+        resetThemeToDefault,
+        resetCopyToDefault,
       }}
     >
       {children}

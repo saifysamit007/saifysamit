@@ -31,6 +31,8 @@ export interface SiteSettingsData {
   maintenanceMessage: string;
   faviconUrl?: string | null;
   preloaderEnabled?: boolean;
+  theme?: any;
+  customCopy?: any;
   sectionVisibility: {
     hero: boolean;
     work: boolean;
@@ -47,6 +49,8 @@ const DEFAULT_SITE_SETTINGS: SiteSettingsData = {
   maintenanceMessage: "Scheduled visual upgrades and system maintenance underway. We'll be back shortly.",
   faviconUrl: null,
   preloaderEnabled: true,
+  theme: null,
+  customCopy: null,
   sectionVisibility: {
     hero: true,
     work: true,
@@ -109,6 +113,8 @@ function initDb(): DatabaseSchema {
         data.siteSettings?.preloaderEnabled !== undefined
           ? data.siteSettings.preloaderEnabled
           : true,
+      theme: data.siteSettings?.theme || null,
+      customCopy: data.siteSettings?.customCopy || null,
     },
   };
 
@@ -577,6 +583,8 @@ app.post('/api/site-settings', requireAdminAuth, (req, res) => {
           typeof settings.preloaderEnabled === 'boolean'
             ? settings.preloaderEnabled
             : current.preloaderEnabled !== false,
+        theme: settings.theme !== undefined ? settings.theme : current.theme,
+        customCopy: settings.customCopy !== undefined ? settings.customCopy : current.customCopy,
         sectionVisibility: {
           hero: settings.sectionVisibility?.hero !== false,
           work: settings.sectionVisibility?.work !== false,
