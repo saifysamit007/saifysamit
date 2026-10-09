@@ -1,8 +1,26 @@
 import { useState, useEffect } from 'react';
-import { ArrowDown, ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play, Image as ImageIcon, X, Plus, Trash2, RotateCcw, Check } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Pause,
+  Play,
+  Image as ImageIcon,
+  X,
+  Plus,
+  Trash2,
+  RotateCcw,
+  Check,
+  Upload,
+  AlertCircle,
+  Link as LinkIcon,
+  FileImage,
+} from 'lucide-react';
 import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { savePermanently, loadPermanently } from '../utils/persistentStorage';
 
 interface HeroProps {
   onExploreWork: () => void;
@@ -59,7 +77,14 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
   });
 
   // Sync with server database
+  // Sync with permanent storage and server database
   useEffect(() => {
+    loadPermanently<HeroBgImage[]>('saify_hero_bg_images', []).then((loaded) => {
+      if (loaded && loaded.length > 0) {
+        setBgImages(loaded);
+      }
+    });
+
     fetch('/api/hero-backgrounds')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -68,9 +93,7 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
       .then((data) => {
         if (data?.backgrounds && Array.isArray(data.backgrounds) && data.backgrounds.length > 0) {
           setBgImages(data.backgrounds);
-          try {
-            localStorage.setItem('saify_hero_bg_images', JSON.stringify(data.backgrounds));
-          } catch {}
+          savePermanently('saify_hero_bg_images', data.backgrounds);
         }
       })
       .catch(() => {});
@@ -81,6 +104,7 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingList, setEditingList] = useState<HeroBgImage[]>([]);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Sync index if list length changes
   useEffect(() => {
@@ -109,6 +133,7 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
 
   const openEditModal = () => {
     setEditingList(JSON.parse(JSON.stringify(bgImages)));
+    setModalError(null);
     setIsEditModalOpen(true);
   };
 
@@ -116,6 +141,90 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
     const updated = [...editingList];
     updated[index][field] = value;
     setEditingList(updated);
+  };
+
+  // Upload an image from PC for a specific row
+  const handleRowFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setModalError('Please select a valid image file (JPG, PNG, WEBP, or SVG).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setModalError('Image size exceeds 10MB. Please choose a smaller image.');
+      return;
+    }
+
+    setModalError(null);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (result) {
+        const updated = [...editingList];
+        updated[index].url = result;
+        const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        if (!updated[index].title || updated[index].title.startsWith('Hero Background #')) {
+          updated[index].title = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
+        }
+        setEditingList(updated);
+      }
+    };
+    reader.onerror = () => {
+      setModalError('Could not read image from PC. Please try again.');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  // Add one or multiple images directly from PC
+  const handleBatchUploadFromPC = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setModalError(null);
+    const newItems: HeroBgImage[] = [];
+    const validFiles = Array.from(files).filter((file) => {
+      if (!file.type.startsWith('image/')) {
+        setModalError(`"${file.name}" is not a valid image file.`);
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setModalError(`"${file.name}" exceeds 10MB limit and was skipped.`);
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    let processedCount = 0;
+    validFiles.forEach((file, i) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const result = event.target?.result as string;
+        if (result) {
+          const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+          newItems.push({
+            id: `bg-${Date.now()}-${i}`,
+            title: cleanName.charAt(0).toUpperCase() + cleanName.slice(1),
+            url: result,
+          });
+        }
+        processedCount++;
+        if (processedCount === validFiles.length) {
+          setEditingList((prev) => [...prev, ...newItems]);
+        }
+      };
+      reader.onerror = () => {
+        processedCount++;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
   };
 
   const handleAddNewImage = () => {
@@ -135,6 +244,8 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
 
   const handleResetDefaults = () => {
     setEditingList(JSON.parse(JSON.stringify(DEFAULT_HERO_BACKGROUND_IMAGES)));
+    savePermanently('saify_hero_bg_images', DEFAULT_HERO_BACKGROUND_IMAGES);
+    setModalError(null);
   };
 
   const handleSaveModal = (e: React.FormEvent) => {
@@ -143,11 +254,9 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
     if (validList.length === 0) return;
 
     setBgImages(validList);
-    try {
-      localStorage.setItem('saify_hero_bg_images', JSON.stringify(validList));
-    } catch {}
+    savePermanently('saify_hero_bg_images', validList);
 
-    // Sync with zero-token server database
+    // Sync with server database if available
     fetch('/api/hero-backgrounds', {
       method: 'POST',
       headers: getAdminAuthHeaders(),
@@ -354,7 +463,7 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
               </div>
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="text-zinc-400 hover:text-white transition-colors"
+                className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" />
@@ -363,82 +472,193 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
 
             {/* Body */}
             <form onSubmit={handleSaveModal} className="flex-1 overflow-y-auto p-5 space-y-4">
-              <p className="text-xs text-zinc-400">
-                Paste any image URL (Discord attachment, Behance, Imgur, Unsplash, or direct image link). Images rotate smoothly across the hero section.
-              </p>
+              <div className="flex items-center justify-between flex-wrap gap-2 text-xs text-zinc-400 bg-[#080B0F] p-3 rounded-xl border border-[#1F2833]">
+                <div className="flex items-center gap-2">
+                  <Upload className="w-4 h-4 text-[#FF4655] shrink-0" />
+                  <span>
+                    Upload high-res background images directly from your computer (JPG, PNG, WEBP) or paste any image URL.
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
+                  Max 10MB/image
+                </span>
+              </div>
 
-              <div className="space-y-3">
-                {editingList.map((item, index) => (
-                  <div
-                    key={item.id || index}
-                    className="p-3.5 rounded-xl bg-[#080B0F] border border-[#1F2833] flex flex-col sm:flex-row items-start sm:items-center gap-3.5"
-                  >
-                    {/* Thumbnail preview */}
-                    <div className="w-16 h-12 rounded-lg overflow-hidden bg-black border border-[#1F2833] shrink-0">
-                      <img
-                        src={item.url}
-                        alt="Preview"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src =
-                            DEFAULT_HERO_BACKGROUND_IMAGES[0].url;
-                        }}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-
-                    {/* Inputs */}
-                    <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-12 gap-2">
-                      <input
-                        type="text"
-                        placeholder="Image Title / Label"
-                        value={item.title}
-                        onChange={(e) =>
-                          handleUpdateImage(index, 'title', e.target.value)
-                        }
-                        className="sm:col-span-5 px-2.5 py-1.5 text-xs bg-[#0E141B] border border-[#1F2833] rounded text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
-                      />
-                      <input
-                        type="url"
-                        required
-                        placeholder="https://... image link"
-                        value={item.url}
-                        onChange={(e) =>
-                          handleUpdateImage(index, 'url', e.target.value)
-                        }
-                        className="sm:col-span-7 px-2.5 py-1.5 text-xs bg-[#0E141B] border border-[#1F2833] rounded text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
-                      />
-                    </div>
-
-                    {/* Delete button */}
-                    <button
-                      type="button"
-                      disabled={editingList.length <= 1}
-                      onClick={() => handleDeleteImage(index)}
-                      className="text-zinc-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-1"
-                      title="Remove this image"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+              {modalError && (
+                <div className="p-3 rounded-xl bg-red-950/80 border border-red-800 text-xs text-red-200 font-mono flex items-center justify-between animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    <span>{modalError}</span>
                   </div>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setModalError(null)}
+                    className="text-red-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
+              <div className="space-y-3.5">
+                {editingList.map((item, index) => {
+                  const isLocalUpload = item.url.startsWith('data:image');
+                  return (
+                    <div
+                      key={item.id || index}
+                      className="p-3.5 rounded-xl bg-[#080B0F] border border-[#1F2833] hover:border-zinc-700 transition-colors flex flex-col sm:flex-row items-start sm:items-center gap-3.5"
+                    >
+                      {/* Thumbnail preview with Hover Replace Button */}
+                      <div className="relative w-20 h-14 rounded-lg overflow-hidden bg-black border border-[#1F2833] shrink-0 group">
+                        <img
+                          src={item.url}
+                          alt="Preview"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              DEFAULT_HERO_BACKGROUND_IMAGES[0].url;
+                          }}
+                          className="w-full h-full object-cover"
+                        />
+                        <label
+                          className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-white"
+                          title="Click to replace image from computer"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-[#FF4655] mb-0.5" />
+                          <span className="text-[9px] font-mono text-zinc-200">Replace</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => handleRowFileUpload(index, e)}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+
+                      {/* Inputs & Controls */}
+                      <div className="flex-1 w-full space-y-2">
+                        {/* Title Row with Status Badge */}
+                        <div className="flex items-center justify-between gap-2">
+                          <input
+                            type="text"
+                            placeholder="Image Title / Label (e.g. Grand Finals Key Art)"
+                            value={item.title}
+                            onChange={(e) =>
+                              handleUpdateImage(index, 'title', e.target.value)
+                            }
+                            className="flex-1 px-2.5 py-1.5 text-xs bg-[#0E141B] border border-[#1F2833] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
+                          />
+
+                          {isLocalUpload ? (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 inline-flex items-center gap-1 shrink-0">
+                              <FileImage className="w-3 h-3" />
+                              <span>PC Upload</span>
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-zinc-400 bg-zinc-900 border border-zinc-800 inline-flex items-center gap-1 shrink-0">
+                              <LinkIcon className="w-3 h-3" />
+                              <span>Link</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Image Source & Upload Button Row */}
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            required
+                            placeholder={
+                              isLocalUpload
+                                ? 'Uploaded from PC (embedded image)'
+                                : 'https://... image link or click upload'
+                            }
+                            value={
+                              isLocalUpload
+                                ? `[PC File: ${item.title || 'Image Data'}]`
+                                : item.url
+                            }
+                            readOnly={isLocalUpload}
+                            onChange={(e) => {
+                              if (!isLocalUpload) {
+                                handleUpdateImage(index, 'url', e.target.value);
+                              }
+                            }}
+                            className={`flex-1 px-2.5 py-1.5 text-xs rounded-lg border focus:outline-none focus:border-[#FF4655] ${
+                              isLocalUpload
+                                ? 'bg-zinc-900/60 border-zinc-800 text-zinc-400 font-mono select-all'
+                                : 'bg-[#0E141B] border-[#1F2833] text-white placeholder-zinc-500'
+                            }`}
+                          />
+
+                          <label
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-[#141B24] hover:bg-[#1f2937] border border-zinc-700 hover:border-[#FF4655] text-zinc-200 hover:text-white transition-all cursor-pointer shrink-0 shadow-sm"
+                            title="Choose image from your PC / computer"
+                          >
+                            <Upload className="w-3.5 h-3.5 text-[#FF4655]" />
+                            <span>Upload from PC</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => handleRowFileUpload(index, e)}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Delete button */}
+                      <button
+                        type="button"
+                        disabled={editingList.length <= 1}
+                        onClick={() => handleDeleteImage(index)}
+                        className="text-zinc-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-zinc-500 transition-colors p-2 rounded-lg hover:bg-red-950/30 cursor-pointer shrink-0"
+                        title={
+                          editingList.length <= 1
+                            ? 'At least one background image must remain'
+                            : 'Remove this background slide'
+                        }
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Add and Reset Row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={handleAddNewImage}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-zinc-300 hover:text-white bg-[#080B0F] border border-[#1F2833] hover:border-[#FF4655] rounded transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5 text-[#FF4655]" />
-                  <span>Add Another Image</span>
-                </button>
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-zinc-800/80">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Primary: Upload directly from PC */}
+                  <label
+                    className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-mono font-bold uppercase tracking-wider text-white bg-[#FF4655] hover:bg-[#ff5a68] rounded-xl transition-all shadow-md shadow-[#FF4655]/30 cursor-pointer"
+                    title="Upload one or multiple images from PC"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Images from PC</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleBatchUploadFromPC}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {/* Secondary: Add URL slot */}
+                  <button
+                    type="button"
+                    onClick={handleAddNewImage}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-mono text-zinc-300 hover:text-white bg-[#0E141B] hover:bg-[#161D26] border border-[#1F2833] hover:border-zinc-600 rounded-xl transition-colors cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 text-[#FF4655]" />
+                    <span>Add URL Slot</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   onClick={handleResetDefaults}
-                  className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3 h-3" />
                   <span>Reset to 5 Original Key Arts</span>
@@ -450,18 +670,18 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors"
+                  className="px-4 py-2 text-xs font-mono text-zinc-400 hover:text-white transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold uppercase tracking-wider text-white bg-[#FF4655] hover:bg-[#ff5a68] rounded transition-all shadow-md shadow-[#FF4655]/30"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 text-xs font-semibold uppercase tracking-wider text-white bg-[#FF4655] hover:bg-[#ff5a68] rounded-xl transition-all shadow-md shadow-[#FF4655]/30 cursor-pointer"
                 >
                   {saveSuccess ? (
                     <>
-                      <Check className="w-3.5 h-3.5" />
+                      <Check className="w-4 h-4" />
                       <span>Saved!</span>
                     </>
                   ) : (

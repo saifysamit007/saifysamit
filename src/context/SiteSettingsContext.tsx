@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useAdmin, getAdminAuthHeaders } from './AdminContext';
+import { savePermanently, loadPermanently } from '../utils/persistentStorage';
 
 export type SectionKey =
   | 'hero'
@@ -282,6 +283,19 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   // Sync from server on mount
   useEffect(() => {
+    // 1. Asynchronously restore from IndexedDB if LocalStorage was cleared
+    loadPermanently<SiteSettings>(STORAGE_KEY, DEFAULT_SETTINGS).then((persisted) => {
+      if (persisted && persisted !== DEFAULT_SETTINGS) {
+        setSettings((prev) => ({
+          ...prev,
+          ...persisted,
+          theme: { ...DEFAULT_THEME_CONFIG, ...(persisted.theme || {}) },
+          customCopy: { ...DEFAULT_SITE_COPY, ...(persisted.customCopy || {}) },
+        }));
+      }
+    });
+
+    // 2. Fetch server database state
     fetch('/api/site-settings')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -289,27 +303,39 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
       })
       .then((data) => {
         if (data?.settings) {
-          const merged: SiteSettings = {
-            maintenanceMode: Boolean(data.settings.maintenanceMode),
-            maintenanceMessage:
-              data.settings.maintenanceMessage || DEFAULT_SETTINGS.maintenanceMessage,
-            faviconUrl:
-              data.settings.faviconUrl !== undefined ? data.settings.faviconUrl : null,
-            preloaderEnabled:
-              data.settings.preloaderEnabled !== undefined
-                ? Boolean(data.settings.preloaderEnabled)
-                : true,
-            theme: { ...DEFAULT_THEME_CONFIG, ...(data.settings.theme || {}) },
-            customCopy: { ...DEFAULT_SITE_COPY, ...(data.settings.customCopy || {}) },
-            sectionVisibility: {
-              ...DEFAULT_SETTINGS.sectionVisibility,
-              ...(data.settings.sectionVisibility || {}),
-            },
-          };
-          setSettings(merged);
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-          } catch {}
+          setSettings((current) => {
+            const currentCopy = current.customCopy || DEFAULT_SITE_COPY;
+            const currentTheme = current.theme || DEFAULT_THEME_CONFIG;
+
+            const merged: SiteSettings = {
+              maintenanceMode:
+                data.settings.maintenanceMode !== undefined
+                  ? Boolean(data.settings.maintenanceMode)
+                  : current.maintenanceMode,
+              maintenanceMessage:
+                data.settings.maintenanceMessage || current.maintenanceMessage,
+              faviconUrl:
+                data.settings.faviconUrl !== undefined && data.settings.faviconUrl !== null
+                  ? data.settings.faviconUrl
+                  : current.faviconUrl || null,
+              preloaderEnabled:
+                data.settings.preloaderEnabled !== undefined
+                  ? Boolean(data.settings.preloaderEnabled)
+                  : current.preloaderEnabled,
+              theme: data.settings.theme
+                ? { ...DEFAULT_THEME_CONFIG, ...currentTheme, ...data.settings.theme }
+                : currentTheme,
+              customCopy: data.settings.customCopy
+                ? { ...DEFAULT_SITE_COPY, ...currentCopy, ...data.settings.customCopy }
+                : currentCopy,
+              sectionVisibility: {
+                ...current.sectionVisibility,
+                ...(data.settings.sectionVisibility || {}),
+              },
+            };
+            savePermanently(STORAGE_KEY, merged);
+            return merged;
+          });
         }
       })
       .catch((err) => {
@@ -370,9 +396,7 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const persistSettings = async (newSettings: SiteSettings): Promise<boolean> => {
     setSettings(newSettings);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
-    } catch {}
+    await savePermanently(STORAGE_KEY, newSettings);
     window.dispatchEvent(
       new CustomEvent('saify_site_settings_updated', { detail: newSettings })
     );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Menu, X, ArrowUpRight, SlidersHorizontal, EyeOff, Palette } from 'lucide-react';
+import { Menu, X, ArrowUpRight, SlidersHorizontal, EyeOff } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
 import { useSiteSettings, SectionKey } from '../context/SiteSettingsContext';
 
@@ -10,7 +10,7 @@ interface NavbarProps {
 export default function Navbar({ onContactClick }: NavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { isAdmin } = useAdmin();
-  const { settings, openSectionManager, openCustomizer } = useSiteSettings();
+  const { settings, openSectionManager } = useSiteSettings();
 
   const allNavLinks: { name: string; href: string; sectionKey: SectionKey }[] = [
     { name: 'Work', href: '#work', sectionKey: 'work' },
@@ -187,29 +187,17 @@ export default function Navbar({ onContactClick }: NavbarProps) {
 
           {/* Zone 3: Primary action CTA */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Admin Quick Buttons: Sections & Theme Studio */}
+            {/* Admin Quick Button: Sections & Maintenance Manager */}
             {isAdmin && (
-              <>
-                <button
-                  type="button"
-                  onClick={openCustomizer}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-sky-950/40 hover:bg-sky-900/60 text-sky-300 hover:text-white border border-sky-500/50 shadow-sm transition-all cursor-pointer"
-                  title="Theme Studio (Winter Theme & Text Customization)"
-                >
-                  <Palette className="w-3.5 h-3.5 text-[#38bdf8]" />
-                  <span className="hidden xl:inline">Theme</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={openSectionManager}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-[#0E141B] hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 shadow-sm transition-all cursor-pointer"
-                  title="Manage Section Visibilities & Maintenance Mode"
-                >
-                  <SlidersHorizontal className="w-3.5 h-3.5 text-[#FF4655]" />
-                  <span className="hidden xl:inline">Sections</span>
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={openSectionManager}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-lg bg-[#0E141B] hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-700/80 shadow-sm transition-all cursor-pointer"
+                title="Manage Section Visibilities & Maintenance Mode"
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-[#FF4655]" />
+                <span className="hidden xl:inline">Sections</span>
+              </button>
             )}
 
             <button
@@ -262,18 +250,6 @@ export default function Navbar({ onContactClick }: NavbarProps) {
 
             {isAdmin && (
               <div className="pt-2 pb-1 space-y-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileMenuOpen(false);
-                    openCustomizer();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 py-2 px-4 text-xs font-mono font-semibold text-sky-300 bg-sky-950/40 border border-sky-500/50 rounded-lg hover:bg-sky-900/60 transition-colors"
-                >
-                  <Palette className="w-3.5 h-3.5 text-[#38bdf8]" />
-                  <span>Theme Studio (Winter Theme & Copy)</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => {
