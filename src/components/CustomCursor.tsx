@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function CustomCursor() {
-  const [pos, setPos] = useState({ x: -100, y: -100 });
+  const cursorRef = useRef<HTMLDivElement | null>(null);
   const [isPointer, setIsPointer] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
   const [isDisabled, setIsDisabled] = useState(false);
+  const rafId = useRef<number | null>(null);
 
   useEffect(() => {
     const isTouch = window.matchMedia('(pointer: coarse)').matches;
@@ -15,50 +16,69 @@ export default function CustomCursor() {
       return;
     }
 
+    let mouseX = -100;
+    let mouseY = -100;
+
     const onMouseMove = (e: MouseEvent) => {
-      setPos({ x: e.clientX, y: e.clientY });
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+
+      if (!rafId.current) {
+        rafId.current = requestAnimationFrame(() => {
+          if (cursorRef.current) {
+            cursorRef.current.style.transform = `translate3d(${mouseX}px, ${mouseY}px, 0)`;
+          }
+          rafId.current = null;
+        });
+      }
+
       if (!isVisible) setIsVisible(true);
 
       const target = e.target as HTMLElement | null;
       if (target) {
-        const isClickable =
+        const isClickable = Boolean(
           target.closest('a') ||
-          target.closest('button') ||
-          target.closest('input') ||
-          target.closest('textarea') ||
-          target.closest('select') ||
-          target.getAttribute('role') === 'button';
-        setIsPointer(!!isClickable);
+            target.closest('button') ||
+            target.closest('input') ||
+            target.closest('textarea') ||
+            target.closest('select') ||
+            target.getAttribute('role') === 'button'
+        );
+        setIsPointer((prev) => (prev !== isClickable ? isClickable : prev));
       }
     };
 
     const onMouseLeave = () => setIsVisible(false);
     const onMouseEnter = () => setIsVisible(true);
 
-    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
     document.addEventListener('mouseleave', onMouseLeave);
     document.addEventListener('mouseenter', onMouseEnter);
 
     return () => {
+      if (rafId.current) cancelAnimationFrame(rafId.current);
       window.removeEventListener('mousemove', onMouseMove);
       document.removeEventListener('mouseleave', onMouseLeave);
       document.removeEventListener('mouseenter', onMouseEnter);
     };
   }, [isVisible]);
 
-  if (isDisabled || !isVisible) return null;
+  if (isDisabled) return null;
 
   return (
     <div
+      ref={cursorRef}
       aria-hidden="true"
-      className="pointer-events-none fixed top-0 left-0 z-50 transition-transform duration-75 ease-out"
+      className="pointer-events-none fixed top-0 left-0 z-50 transition-opacity duration-150"
       style={{
-        transform: `translate3d(${pos.x}px, ${pos.y}px, 0)`,
+        opacity: isVisible ? 1 : 0,
+        transform: 'translate3d(-100px, -100px, 0)',
+        willChange: 'transform',
       }}
     >
       {/* Outer subtle ring with Valorant Red */}
       <div
-        className={`-translate-x-1/2 -translate-y-1/2 rounded-full border border-[#FF4655]/60 transition-all duration-200 ease-out ${
+        className={`-translate-x-1/2 -translate-y-1/2 rounded-full border border-[#FF4655]/60 transition-all duration-150 ease-out ${
           isPointer
             ? 'w-10 h-10 bg-[#FF4655]/15 scale-110 border-[#FF4655]'
             : 'w-6 h-6 scale-100'

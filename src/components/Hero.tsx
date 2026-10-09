@@ -176,6 +176,9 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
               <img
                 src={img.url}
                 alt={img.title}
+                loading={idx === 0 ? 'eager' : 'lazy'}
+                fetchPriority={idx === 0 ? 'high' : 'low'}
+                decoding="async"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   // Fallback if image URL is invalid

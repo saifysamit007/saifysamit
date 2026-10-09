@@ -424,6 +424,8 @@ export default function About() {
                   <img
                     src={portraitUrl}
                     alt="Saify Samit portrait"
+                    loading="lazy"
+                    decoding="async"
                     draggable={false}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover object-center filter contrast-105"

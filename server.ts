@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
@@ -6,11 +7,15 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+// Explicitly disable HMR in AI Studio cloud container environment per environment constraints
+process.env.DISABLE_HMR = 'true';
 dotenv.config();
 
 const app = express();
 const port = 3000;
 
+// Enable gzip/brotli compression for all HTTP responses
+app.use(compression());
 app.use(express.json({ limit: '15mb' }));
 
 const ai = new GoogleGenAI({
@@ -688,13 +693,26 @@ Guidelines:
 
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
-    app.use(express.static('dist'));
+    app.use(
+      express.static('dist', {
+        maxAge: '1y',
+        etag: true,
+        setHeaders: (res, filePath) => {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+          } else if (filePath.includes('/assets/')) {
+            res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+          }
+        },
+      })
+    );
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
       res.sendFile('index.html', { root: 'dist' });
     });
   } else {
     const vite = await createViteServer({
-      server: { middlewareMode: true, port: 3000, host: '0.0.0.0' },
+      server: { middlewareMode: true, port: 3000, host: '0.0.0.0', hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
