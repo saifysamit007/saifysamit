@@ -61,7 +61,10 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
   // Sync with server database
   useEffect(() => {
     fetch('/api/hero-backgrounds')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.backgrounds && Array.isArray(data.backgrounds) && data.backgrounds.length > 0) {
           setBgImages(data.backgrounds);

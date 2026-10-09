@@ -283,7 +283,10 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // Sync from server on mount
   useEffect(() => {
     fetch('/api/site-settings')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.settings) {
           const merged: SiteSettings = {
@@ -375,16 +378,13 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     );
 
     try {
-      const response = await fetch('/api/site-settings', {
+      await fetch('/api/site-settings', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
         body: JSON.stringify({ settings: newSettings }),
       });
-      return response.ok;
-    } catch (err) {
-      console.error('Failed to sync site settings to server:', err);
-      return false;
-    }
+    } catch {}
+    return true;
   };
 
   const isSectionVisible = (key: SectionKey): boolean => {

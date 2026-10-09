@@ -75,7 +75,10 @@ export default function About() {
   // Sync framing and portrait image with zero-token database on mount
   useEffect(() => {
     fetch('/api/portrait-framing')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.framing && typeof data.framing.x === 'number') {
           setFraming(data.framing);
@@ -87,7 +90,10 @@ export default function About() {
       .catch(() => {});
 
     fetch('/api/portrait-image')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.image && typeof data.image === 'string' && data.image.trim().length > 0) {
           setPortraitUrl(data.image.trim());

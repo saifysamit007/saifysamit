@@ -33,7 +33,10 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
   // Sync with zero-token server database
   useEffect(() => {
     fetch('/api/projects')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.projects && Array.isArray(data.projects) && data.projects.length > 0) {
           setProjectsList(data.projects);
@@ -42,6 +45,7 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
           } catch {}
         }
       })
+      .catch(() => {})
     const handleProjectsUpdated = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
         setProjectsList(e.detail);
