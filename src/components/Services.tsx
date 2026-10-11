@@ -3,6 +3,7 @@ import { ArrowUpRight, Plus, Pencil, Trash2, RotateCcw, X, Check, Wrench } from 
 import { SERVICES_DATA, ServiceItem } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { savePermanently, loadPermanently, idbRemoveItem } from '../utils/persistentStorage';
 
 interface ServicesProps {
   onSelectService?: (service: ServiceItem) => void;
@@ -115,16 +116,23 @@ export default function Services({ onSelectService }: ServicesProps) {
     return SERVICES_DATA;
   });
 
-  // Sync with zero-token server database
+  // Sync with permanent storage (IndexedDB + LocalStorage) and server database
   useEffect(() => {
+    loadPermanently<ServiceItem[]>('saify_services_custom', SERVICES_DATA).then((loaded) => {
+      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+        setServicesList(loaded);
+      }
+    });
+
     fetch('/api/services')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.services && Array.isArray(data.services) && data.services.length > 0) {
           setServicesList(data.services);
-          try {
-            localStorage.setItem('saify_services_custom', JSON.stringify(data.services));
-          } catch {}
+          savePermanently('saify_services_custom', data.services);
         }
       })
       .catch(() => {});
@@ -241,9 +249,7 @@ export default function Services({ onSelectService }: ServicesProps) {
     }
 
     setServicesList(updated);
-    try {
-      localStorage.setItem('saify_services_custom', JSON.stringify(updated));
-    } catch {}
+    savePermanently('saify_services_custom', updated);
 
     fetch('/api/services', {
       method: 'POST',
@@ -282,9 +288,7 @@ export default function Services({ onSelectService }: ServicesProps) {
       const targetId = deleteConfirm.serviceId;
       const updated = servicesList.filter((s) => s.id !== targetId);
       setServicesList(updated);
-      try {
-        localStorage.setItem('saify_services_custom', JSON.stringify(updated));
-      } catch {}
+      savePermanently('saify_services_custom', updated);
 
       fetch('/api/services', {
         method: 'POST',
@@ -297,9 +301,11 @@ export default function Services({ onSelectService }: ServicesProps) {
       }
     } else if (deleteConfirm.type === 'reset') {
       setServicesList(SERVICES_DATA);
+      idbRemoveItem('saify_services_custom');
       try {
         localStorage.removeItem('saify_services_custom');
       } catch {}
+      savePermanently('saify_services_custom', SERVICES_DATA);
       fetch('/api/services/reset', {
         method: 'POST',
         headers: getAdminAuthHeaders(),

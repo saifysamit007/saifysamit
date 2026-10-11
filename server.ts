@@ -74,6 +74,7 @@ interface DatabaseSchema {
   testimonials: any[] | null;
   portraitFraming: { x: number; y: number; scale: number } | null;
   portraitImage: string | null;
+  artistProfile?: any | null;
   faviconUrl?: string | null;
   adminPasscodeHash?: string;
   siteSettings?: SiteSettingsData | null;
@@ -108,6 +109,7 @@ function initDb(): DatabaseSchema {
     testimonials: data.testimonials || null,
     portraitFraming: data.portraitFraming || null,
     portraitImage: data.portraitImage || null,
+    artistProfile: data.artistProfile || null,
     faviconUrl: data.faviconUrl || data.siteSettings?.faviconUrl || null,
     adminPasscodeHash: data.adminPasscodeHash || hashPasscode(DEFAULT_INITIAL_PASSCODE),
     siteSettings: {
@@ -555,6 +557,31 @@ app.post('/api/portrait-image/reset', requireAdminAuth, (req, res) => {
   db.portraitImage = null;
   saveDb(db);
   res.json({ success: true, message: 'Reset to default portrait image' });
+});
+
+// 6b. Artist Profile (Bio, Editorial Philosophy, Title, Experience) REST API
+app.get('/api/artist-profile', (req, res) => {
+  res.json({ profile: db.artistProfile || null });
+});
+
+app.post('/api/artist-profile', requireAdminAuth, (req, res) => {
+  try {
+    const { profile } = req.body;
+    if (profile && typeof profile === 'object') {
+      db.artistProfile = profile;
+      saveDb(db);
+      return res.json({ success: true, profile: db.artistProfile });
+    }
+    res.status(400).json({ error: 'Invalid profile data' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/artist-profile/reset', requireAdminAuth, (req, res) => {
+  db.artistProfile = null;
+  saveDb(db);
+  res.json({ success: true, message: 'Reset to default artist profile' });
 });
 
 // 7. Site Settings (Maintenance Mode & Section Visibility) REST API

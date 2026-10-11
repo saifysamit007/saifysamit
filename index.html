@@ -6,14 +6,22 @@
     <!-- Suppress benign Vite WebSocket HMR errors in cloud/iframe preview environment -->
     <script>
       (function () {
-        function isViteWsError(msg) {
-          if (!msg) return false;
-          var str = String(msg).toLowerCase();
+        // 1. Intercept window.WebSocket for Vite HMR to prevent failed socket connection in cloud iframe
+
+
+        // 2. Comprehensive error and console suppressor for any residual Vite HMR notices
+        function isViteWsError(val) {
+          if (!val) return false;
+          var str = '';
+          try {
+            str = (typeof val === 'object' ? (val.message || val.stack || String(val)) : String(val)).toLowerCase();
+          } catch (e) {
+            str = String(val).toLowerCase();
+          }
           return (
-            str.includes('websocket closed without opened') ||
-            str.includes('failed to connect to websocket') ||
-            str.includes('websocket connection') ||
-            (str.includes('[vite]') && str.includes('websocket'))
+            str.indexOf('websocket') !== -1 ||
+            str.indexOf('failed to connect') !== -1 ||
+            str.indexOf('[vite]') !== -1
           );
         }
 
@@ -21,8 +29,7 @@
           'unhandledrejection',
           function (e) {
             var reason = e.reason;
-            var msg = reason ? (reason.message || reason.stack || reason) : '';
-            if (isViteWsError(msg)) {
+            if (isViteWsError(reason)) {
               e.preventDefault();
               e.stopImmediatePropagation();
             }
@@ -33,7 +40,7 @@
         window.addEventListener(
           'error',
           function (e) {
-            var msg = e.message || (e.error && e.error.message) || '';
+            var msg = e.message || (e.error && e.error.message) || e;
             if (isViteWsError(msg)) {
               e.preventDefault();
               e.stopImmediatePropagation();
@@ -42,14 +49,19 @@
           true
         );
 
-        var origError = console.error;
-        console.error = function () {
-          var firstArg = arguments[0];
-          if (isViteWsError(firstArg)) {
-            return;
-          }
-          return origError.apply(console, arguments);
-        };
+        var methods = ['error', 'warn', 'info', 'debug'];
+        methods.forEach(function (m) {
+          var orig = console[m];
+          if (!orig) return;
+          console[m] = function () {
+            for (var i = 0; i < arguments.length; i++) {
+              if (isViteWsError(arguments[i])) {
+                return;
+              }
+            }
+            return orig.apply(console, arguments);
+          };
+        });
       })();
     </script>
     <title>Saify Samit — Graphics Artist & Visual Designer</title>

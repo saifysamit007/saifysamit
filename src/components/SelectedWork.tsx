@@ -1,9 +1,10 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, SlidersHorizontal, Check, X, Sparkles, Loader2, Image as ImageIcon, Trash2, RotateCcw, Images, Gamepad2, Cpu, Video } from 'lucide-react';
+import { Plus, SlidersHorizontal, Check, X, Sparkles, Loader2, Image as ImageIcon, Trash2, RotateCcw, Images, Gamepad2, Cpu, Video, Upload, FileImage, Link as LinkIcon } from 'lucide-react';
 import { PORTFOLIO_PROJECTS, ProjectItem } from '../data/portfolioData';
 import ProjectCard from './ProjectCard';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
 
 interface SelectedWorkProps {
   onSelectProject: (project: ProjectItem) => void;
@@ -30,8 +31,14 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
     return PORTFOLIO_PROJECTS;
   });
 
-  // Sync with zero-token server database
+  // Sync with permanent storage and server database
   useEffect(() => {
+    loadPermanently<ProjectItem[]>('saify_portfolio_projects_custom', []).then((loaded) => {
+      if (loaded && loaded.length > 0) {
+        setProjectsList(loaded);
+      }
+    });
+
     fetch('/api/projects')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -40,12 +47,10 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
       .then((data) => {
         if (data?.projects && Array.isArray(data.projects) && data.projects.length > 0) {
           setProjectsList(data.projects);
-          try {
-            localStorage.setItem('saify_portfolio_projects_custom', JSON.stringify(data.projects));
-          } catch {}
+          savePermanently('saify_portfolio_projects_custom', data.projects);
         }
       })
-      .catch(() => {})
+      .catch(() => {});
     const handleProjectsUpdated = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
         setProjectsList(e.detail);
@@ -215,6 +220,42 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
     setFormGalleryImages(formGalleryImages.filter((_, i) => i !== index));
   };
 
+  // Upload main cover image from PC
+  const handleCoverFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setFormError('Please select a valid image file (JPG, PNG, WEBP).');
+      return;
+    }
+    try {
+      const compressed = await compressImageFile(file, 1920, 0.85);
+      if (compressed) {
+        setFormMainImage(compressed);
+        setFormError(null);
+      }
+    } catch {
+      setFormError('Could not process image file.');
+    }
+    e.target.value = '';
+  };
+
+  // Upload additional gallery images from PC
+  const handleGalleryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const valid = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    for (const file of valid) {
+      try {
+        const compressed = await compressImageFile(file, 1920, 0.85);
+        if (compressed) {
+          setFormGalleryImages((prev) => [...prev, compressed]);
+        }
+      } catch {}
+    }
+    e.target.value = '';
+  };
+
   // Save Project (Add or Edit)
   const handleSaveProject = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,10 +352,8 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
 
     setProjectsList(updated);
 
-    // Save to local storage
-    try {
-      localStorage.setItem('saify_portfolio_projects_custom', JSON.stringify(updated));
-    } catch {}
+    // Save to permanent multi-layer storage (IndexedDB + LocalStorage)
+    savePermanently('saify_portfolio_projects_custom', updated);
 
     // Save to zero-token free server database
     fetch('/api/projects', {
@@ -368,9 +407,7 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
       const targetId = deleteConfirm.projectId;
       const updated = projectsList.filter((p) => p.id !== targetId);
       setProjectsList(updated);
-      try {
-        localStorage.setItem('saify_portfolio_projects_custom', JSON.stringify(updated));
-      } catch {}
+      savePermanently('saify_portfolio_projects_custom', updated);
       fetch('/api/projects', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -382,9 +419,11 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
       }
     } else if (deleteConfirm.type === 'reset') {
       setProjectsList(PORTFOLIO_PROJECTS);
+      idbRemoveItem('saify_portfolio_projects_custom');
       try {
         localStorage.removeItem('saify_portfolio_projects_custom');
       } catch {}
+      savePermanently('saify_portfolio_projects_custom', PORTFOLIO_PROJECTS);
       fetch('/api/projects/reset', {
         method: 'POST',
         headers: getAdminAuthHeaders(),

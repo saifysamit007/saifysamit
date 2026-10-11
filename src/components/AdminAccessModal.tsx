@@ -15,6 +15,7 @@ import {
   SlidersHorizontal,
   Globe,
   Zap,
+  Type,
 } from 'lucide-react';
 import { useAdmin } from '../context/AdminContext';
 import { useSiteSettings, DEFAULT_FAVICON_SVG } from '../context/SiteSettingsContext';
@@ -38,6 +39,7 @@ export default function AdminAccessModal() {
     toggleMaintenanceMode,
     openSectionManager,
     openFaviconModal,
+    openCustomizer,
     togglePreloader,
   } = useSiteSettings();
 
@@ -108,6 +110,17 @@ export default function AdminAccessModal() {
           >
             <Globe className="w-3 h-3 text-[#FF4655]" />
             <span className="hidden sm:inline">Favicon</span>
+          </button>
+
+          {/* Quick Text & Copy Customizer */}
+          <button
+            type="button"
+            onClick={openCustomizer}
+            className="ml-1 inline-flex items-center gap-1 text-[11px] text-zinc-300 hover:text-[#FF4655] border-l border-zinc-700 pl-2 transition-colors cursor-pointer"
+            title="Edit Headlines, Subtitles & Website Text"
+          >
+            <Type className="w-3 h-3 text-[#FF4655]" />
+            <span className="hidden sm:inline">Text & Copy</span>
           </button>
 
           {/* Quick Section & Maintenance Manager */}
@@ -243,6 +256,35 @@ export default function AdminAccessModal() {
                   >
                     <Globe className="w-3.5 h-3.5 text-[#FF4655]" />
                     <span>Change Favicon</span>
+                  </button>
+                </div>
+
+                {/* Website Copy & Text Editor Card */}
+                <div className="p-3 rounded-xl bg-[#080B0F] border border-zinc-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded bg-[#16191E] border border-zinc-700 flex items-center justify-center text-[#FF4655] shrink-0">
+                      <Type className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-mono font-bold text-white block">
+                        Website Text & Copy
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        Hero headline, badge, subtitle, contact copy
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeAccessModal();
+                      openCustomizer();
+                    }}
+                    className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-[#141B24] hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    <Type className="w-3.5 h-3.5 text-[#FF4655]" />
+                    <span>Edit Text</span>
                   </button>
                 </div>
 

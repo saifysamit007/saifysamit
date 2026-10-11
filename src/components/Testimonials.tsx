@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Star,
   MessageCircle,
@@ -14,10 +14,12 @@ import {
   Twitter,
   Image as ImageIcon,
   Sparkles,
+  Upload,
 } from 'lucide-react';
 import { TESTIMONIALS_DATA, TestimonialItem } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
 
 const AVATAR_PRESETS = [
   { label: 'Esports Director', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80' },
@@ -43,16 +45,23 @@ export default function Testimonials() {
     return TESTIMONIALS_DATA;
   });
 
-  // Sync with zero-token server database
+  // Sync with permanent storage (IndexedDB + LocalStorage) and server database
   useEffect(() => {
+    loadPermanently<TestimonialItem[]>('saify_testimonials_custom', TESTIMONIALS_DATA).then((loaded) => {
+      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+        setTestimonialsList(loaded);
+      }
+    });
+
     fetch('/api/testimonials')
-      .then((res) => res.json())
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
       .then((data) => {
         if (data?.testimonials && Array.isArray(data.testimonials) && data.testimonials.length > 0) {
           setTestimonialsList(data.testimonials);
-          try {
-            localStorage.setItem('saify_testimonials_custom', JSON.stringify(data.testimonials));
-          } catch {}
+          savePermanently('saify_testimonials_custom', data.testimonials);
         }
       })
       .catch(() => {});
@@ -63,6 +72,7 @@ export default function Testimonials() {
   const [editingTestimonialId, setEditingTestimonialId] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // In-app Confirmation Modal State (replaces window.confirm)
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -82,6 +92,28 @@ export default function Testimonials() {
   const [formRating, setFormRating] = useState<number>(5);
   const [formAvatar, setFormAvatar] = useState('');
   const [formQuote, setFormQuote] = useState('');
+
+  // Local PC File Upload for Avatar
+  const handleAvatarFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setFormError('Please select a valid image file (JPG, PNG, WEBP).');
+      return;
+    }
+
+    try {
+      const compressed = await compressImageFile(file, 400, 0.85);
+      if (compressed) {
+        setFormAvatar(compressed);
+        setFormError(null);
+      }
+    } catch {
+      setFormError('Failed to process image from device.');
+    }
+    e.target.value = '';
+  };
 
   const openAddModal = () => {
     setEditingTestimonialId(null);
@@ -159,9 +191,7 @@ export default function Testimonials() {
     }
 
     setTestimonialsList(updated);
-    try {
-      localStorage.setItem('saify_testimonials_custom', JSON.stringify(updated));
-    } catch {}
+    savePermanently('saify_testimonials_custom', updated);
 
     fetch('/api/testimonials', {
       method: 'POST',
@@ -200,9 +230,7 @@ export default function Testimonials() {
       const targetId = deleteConfirm.testimonialId;
       const updated = testimonialsList.filter((t) => t.id !== targetId);
       setTestimonialsList(updated);
-      try {
-        localStorage.setItem('saify_testimonials_custom', JSON.stringify(updated));
-      } catch {}
+      savePermanently('saify_testimonials_custom', updated);
 
       fetch('/api/testimonials', {
         method: 'POST',
@@ -215,9 +243,11 @@ export default function Testimonials() {
       }
     } else if (deleteConfirm.type === 'reset') {
       setTestimonialsList(TESTIMONIALS_DATA);
+      idbRemoveItem('saify_testimonials_custom');
       try {
         localStorage.removeItem('saify_testimonials_custom');
       } catch {}
+      savePermanently('saify_testimonials_custom', TESTIMONIALS_DATA);
       fetch('/api/testimonials/reset', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -652,9 +682,25 @@ export default function Testimonials() {
                     type="url"
                     value={formAvatar}
                     onChange={(e) => setFormAvatar(e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="https://images.unsplash.com/... or upload from PC"
                     className="flex-1 px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
                   />
+                  <input
+                    type="file"
+                    ref={avatarFileInputRef}
+                    onChange={handleAvatarFileUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarFileInputRef.current?.click()}
+                    className="px-3 py-2 text-xs font-mono font-semibold bg-[#1F2833] hover:bg-[#FF4655] hover:text-white text-zinc-200 border border-zinc-700 hover:border-[#FF4655] rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                    title="Upload picture directly from your computer"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[#FF4655] group-hover:text-white" />
+                    <span>Upload PC</span>
+                  </button>
                 </div>
 
                 {/* Quick Avatar Presets */}

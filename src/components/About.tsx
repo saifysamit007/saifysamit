@@ -17,9 +17,35 @@ import {
   Upload,
   Link as LinkIcon,
   RefreshCw,
+  Pencil,
+  FileText,
 } from 'lucide-react';
 import { ARTIST_PROFILE, CORE_TOOLS } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
+import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
+
+export interface EditableArtistProfile {
+  name: string;
+  title: string;
+  age: string;
+  quote: string;
+  editorialPhilosophy: string;
+  locationDetails: string;
+  experienceYears: string;
+  locationTag: string;
+}
+
+export const DEFAULT_ARTIST_PROFILE: EditableArtistProfile = {
+  name: ARTIST_PROFILE.name,
+  title: ARTIST_PROFILE.title,
+  age: 'Age 22',
+  quote: '"Design is not decoration. It is communication with commercial intent."',
+  editorialPhilosophy: ARTIST_PROFILE.editorialPhilosophy,
+  locationDetails:
+    'Based in Chittagong, Bangladesh, operating internationally for organizations, competitive esports franchises, high-growth commercial enterprises, and high-visibility digital content brands. Every deliverable is backed by structured layered files, high turnaround velocity, and strict production compliance.',
+  experienceYears: '6+ Years Active Experience',
+  locationTag: 'Remote / Worldwide',
+};
 
 interface PortraitFraming {
   x: number; // percentage or pixel offset
@@ -44,6 +70,25 @@ export default function About() {
     } catch {}
     return ARTIST_PROFILE.portraitImage;
   });
+
+  // Editable Artist Profile State (Bio, Name, Title, Quotes)
+  const [profile, setProfile] = useState<EditableArtistProfile>(() => {
+    try {
+      const saved = localStorage.getItem('saify_artist_profile_custom');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed.name === 'string') {
+          return { ...DEFAULT_ARTIST_PROFILE, ...parsed };
+        }
+      }
+    } catch {}
+    return DEFAULT_ARTIST_PROFILE;
+  });
+
+  // Modal State for Editing Bio & Text
+  const [isEditBioOpen, setIsEditBioOpen] = useState(false);
+  const [bioForm, setBioForm] = useState<EditableArtistProfile>(DEFAULT_ARTIST_PROFILE);
+  const [bioSaveSuccess, setBioSaveSuccess] = useState(false);
 
   // Modal State for Changing Photo
   const [isChangePhotoOpen, setIsChangePhotoOpen] = useState(false);
@@ -72,8 +117,28 @@ export default function About() {
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync framing and portrait image with zero-token database on mount
+  // Sync framing, portrait image, and artist profile with permanent storage and server database on mount
   useEffect(() => {
+    loadPermanently<string>('saify_portrait_image_url', '').then((savedUrl) => {
+      if (savedUrl && savedUrl.trim().length > 0) {
+        setPortraitUrl(savedUrl.trim());
+      }
+    });
+
+    loadPermanently<PortraitFraming>('saify_portrait_framing', DEFAULT_FRAMING).then((savedFraming) => {
+      if (savedFraming && typeof savedFraming.x === 'number') {
+        setFraming(savedFraming);
+      }
+    });
+
+    loadPermanently<EditableArtistProfile>('saify_artist_profile_custom', DEFAULT_ARTIST_PROFILE).then(
+      (savedProfile) => {
+        if (savedProfile && typeof savedProfile.name === 'string') {
+          setProfile({ ...DEFAULT_ARTIST_PROFILE, ...savedProfile });
+        }
+      }
+    );
+
     fetch('/api/portrait-framing')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -82,9 +147,7 @@ export default function About() {
       .then((data) => {
         if (data?.framing && typeof data.framing.x === 'number') {
           setFraming(data.framing);
-          try {
-            localStorage.setItem('saify_portrait_framing', JSON.stringify(data.framing));
-          } catch {}
+          savePermanently('saify_portrait_framing', data.framing);
         }
       })
       .catch(() => {});
@@ -97,9 +160,21 @@ export default function About() {
       .then((data) => {
         if (data?.image && typeof data.image === 'string' && data.image.trim().length > 0) {
           setPortraitUrl(data.image.trim());
-          try {
-            localStorage.setItem('saify_portrait_image_url', data.image.trim());
-          } catch {}
+          savePermanently('saify_portrait_image_url', data.image.trim());
+        }
+      })
+      .catch(() => {});
+
+    fetch('/api/artist-profile')
+      .then((res) => {
+        const ct = res.headers.get('content-type') || '';
+        return ct.includes('application/json') ? res.json() : null;
+      })
+      .then((data) => {
+        if (data?.profile && typeof data.profile.name === 'string') {
+          const merged = { ...DEFAULT_ARTIST_PROFILE, ...data.profile };
+          setProfile(merged);
+          savePermanently('saify_artist_profile_custom', merged);
         }
       })
       .catch(() => {});
@@ -112,7 +187,7 @@ export default function About() {
   };
 
   // Handle local file upload (converts to base64 Data URL)
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -121,23 +196,16 @@ export default function About() {
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setPhotoError('Image size exceeds 8MB. Please choose a smaller image.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
-        setNewPhotoInput(result);
+    try {
+      const compressed = await compressImageFile(file, 1600, 0.88);
+      if (compressed) {
+        setNewPhotoInput(compressed);
         setPhotoError(null);
       }
-    };
-    reader.onerror = () => {
-      setPhotoError('Could not read image from device. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setPhotoError('Could not process image from device. Please try again.');
+    }
+    e.target.value = '';
   };
 
   const handleSavePhoto = (e: React.FormEvent) => {
@@ -149,9 +217,7 @@ export default function About() {
 
     const trimmed = newPhotoInput.trim();
     setPortraitUrl(trimmed);
-    try {
-      localStorage.setItem('saify_portrait_image_url', trimmed);
-    } catch {}
+    savePermanently('saify_portrait_image_url', trimmed);
 
     fetch('/api/portrait-image', {
       method: 'POST',
@@ -164,6 +230,7 @@ export default function About() {
 
   const handleResetPhoto = () => {
     setPortraitUrl(ARTIST_PROFILE.portraitImage);
+    idbRemoveItem('saify_portrait_image_url');
     try {
       localStorage.removeItem('saify_portrait_image_url');
     } catch {}
@@ -175,12 +242,48 @@ export default function About() {
     setIsChangePhotoOpen(false);
   };
 
+  const handleOpenEditBio = () => {
+    setBioForm({ ...profile });
+    setIsEditBioOpen(true);
+  };
+
+  const handleSaveBio = (e: React.FormEvent) => {
+    e.preventDefault();
+    setProfile(bioForm);
+    savePermanently('saify_artist_profile_custom', bioForm);
+
+    fetch('/api/artist-profile', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+      body: JSON.stringify({ profile: bioForm }),
+    }).catch(() => {});
+
+    setBioSaveSuccess(true);
+    setTimeout(() => {
+      setBioSaveSuccess(false);
+      setIsEditBioOpen(false);
+    }, 600);
+  };
+
+  const handleResetBio = () => {
+    setBioForm(DEFAULT_ARTIST_PROFILE);
+    setProfile(DEFAULT_ARTIST_PROFILE);
+    idbRemoveItem('saify_artist_profile_custom');
+    try {
+      localStorage.removeItem('saify_artist_profile_custom');
+    } catch {}
+    savePermanently('saify_artist_profile_custom', DEFAULT_ARTIST_PROFILE);
+
+    fetch('/api/artist-profile/reset', {
+      method: 'POST',
+      headers: getAdminAuthHeaders(),
+    }).catch(() => {});
+  };
+
   // Save framing whenever it changes
   const saveFraming = (newFraming: PortraitFraming) => {
     setFraming(newFraming);
-    try {
-      localStorage.setItem('saify_portrait_framing', JSON.stringify(newFraming));
-    } catch {}
+    savePermanently('saify_portrait_framing', newFraming);
 
     fetch('/api/portrait-framing', {
       method: 'POST',
@@ -255,9 +358,7 @@ export default function About() {
     const handleMouseUp = () => {
       if (isDragging) {
         setIsDragging(false);
-        try {
-          localStorage.setItem('saify_portrait_framing', JSON.stringify(framing));
-        } catch {}
+        savePermanently('saify_portrait_framing', framing);
         fetch('/api/portrait-framing', {
           method: 'POST',
           headers: getAdminAuthHeaders(),
@@ -271,9 +372,7 @@ export default function About() {
     const handleTouchEnd = () => {
       if (isDragging) {
         setIsDragging(false);
-        try {
-          localStorage.setItem('saify_portrait_framing', JSON.stringify(framing));
-        } catch {}
+        savePermanently('saify_portrait_framing', framing);
         fetch('/api/portrait-framing', {
           method: 'POST',
           headers: getAdminAuthHeaders(),
@@ -329,7 +428,7 @@ export default function About() {
                     <span>Portrait Controls</span>
                   </span>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={handleOpenChangePhoto}
@@ -338,6 +437,16 @@ export default function About() {
                     >
                       <Camera className="w-3.5 h-3.5" />
                       <span>Change Picture</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenEditBio}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-colors border bg-[#141B24] text-zinc-200 border-zinc-700 hover:border-[#FF4655] hover:text-white cursor-pointer shadow-sm"
+                      title="Edit biography, name, quote, and experience details"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-[#FF4655]" />
+                      <span>Edit Bio</span>
                     </button>
 
                     <button
@@ -477,10 +586,10 @@ export default function About() {
                     STUDIO PORTRAIT · 2026
                   </div>
                   <h3 className="text-lg sm:text-xl font-bold text-white font-display">
-                    {ARTIST_PROFILE.name}
+                    {profile.name}
                   </h3>
                   <div className="text-xs text-zinc-400 mt-0.5">
-                    {ARTIST_PROFILE.title} · Age 22
+                    {profile.title} · {profile.age}
                   </div>
                 </div>
               </div>
@@ -489,11 +598,11 @@ export default function About() {
               <div className="mt-3 sm:mt-4 p-3.5 sm:p-4 rounded-xl bg-[#0E141B] border border-[#1F2833] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-4 text-xs font-mono">
                 <div className="flex items-center gap-2 text-zinc-300">
                   <Clock className="w-4 h-4 text-[#FF4655] shrink-0" />
-                  <span>6+ Years Active Experience</span>
+                  <span>{profile.experienceYears}</span>
                 </div>
                 <div className="flex items-center gap-1.5 text-zinc-400">
                   <MapPin className="w-3.5 h-3.5 shrink-0" />
-                  <span>Remote / Worldwide</span>
+                  <span>{profile.locationTag}</span>
                 </div>
               </div>
             </div>
@@ -501,20 +610,33 @@ export default function About() {
 
           {/* Right Column: Editorial Bio */}
           <div className="lg:col-span-7 flex flex-col justify-center">
-            <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold mb-3 block">
-              BACKGROUND & PHILOSOPHY
-            </span>
+            <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold block">
+                BACKGROUND & PHILOSOPHY
+              </span>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={handleOpenEditBio}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono text-zinc-300 hover:text-white bg-[#0E141B] border border-zinc-700 hover:border-[#FF4655] transition-colors cursor-pointer"
+                  title="Edit editorial bio & facts"
+                >
+                  <Pencil className="w-3 h-3 text-[#FF4655]" />
+                  <span>Edit Bio Text</span>
+                </button>
+              )}
+            </div>
 
             <blockquote className="text-2xl sm:text-4xl font-extrabold text-white font-display tracking-tight leading-snug mb-6">
-              "Design is not decoration. It is communication with commercial intent."
+              {profile.quote}
             </blockquote>
 
             <p className="text-sm sm:text-base text-zinc-300 leading-relaxed mb-6 font-normal">
-              {ARTIST_PROFILE.editorialPhilosophy}
+              {profile.editorialPhilosophy}
             </p>
 
             <p className="text-sm sm:text-base text-zinc-400 leading-relaxed mb-8">
-              Based in Chittagong, Bangladesh, operating internationally for organizations, competitive esports franchises, high-growth commercial enterprises, and high-visibility digital content brands. Every deliverable is backed by structured layered files, high turnaround velocity, and strict production compliance.
+              {profile.locationDetails}
             </p>
 
             {/* Core Software Mastered Strip */}
@@ -699,6 +821,185 @@ export default function About() {
                   >
                     <Check className="w-3.5 h-3.5" />
                     <span>Apply Picture</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Bio & Profile Information Modal (Admin Only) */}
+      {isEditBioOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl bg-[#0E141B] border border-[#FF4655]/40 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 mb-4 border-b border-[#1F2833]">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#FF4655]/15 border border-[#FF4655]/40 flex items-center justify-center text-[#FF4655]">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-display">
+                    Edit Bio & Profile Information
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Customize your name, professional title, quote, philosophy, and details
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEditBioOpen(false)}
+                className="text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveBio} className="space-y-4">
+              {/* Name & Professional Title */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-300 mb-1">
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bioForm.name}
+                    onChange={(e) => setBioForm({ ...bioForm, name: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-300 mb-1">
+                    Professional Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={bioForm.title}
+                    onChange={(e) => setBioForm({ ...bioForm, title: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                  />
+                </div>
+              </div>
+
+              {/* Age / Tag & Experience Tag & Location Tag */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block text-xs font-mono text-zinc-300 mb-1">
+                    Age / Subtitle Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={bioForm.age}
+                    onChange={(e) => setBioForm({ ...bioForm, age: e.target.value })}
+                    placeholder="Age 22"
+                    className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-300 mb-1">
+                    Experience Badge
+                  </label>
+                  <input
+                    type="text"
+                    value={bioForm.experienceYears}
+                    onChange={(e) => setBioForm({ ...bioForm, experienceYears: e.target.value })}
+                    placeholder="6+ Years Active Experience"
+                    className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono text-zinc-300 mb-1">
+                    Location Badge
+                  </label>
+                  <input
+                    type="text"
+                    value={bioForm.locationTag}
+                    onChange={(e) => setBioForm({ ...bioForm, locationTag: e.target.value })}
+                    placeholder="Remote / Worldwide"
+                    className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                  />
+                </div>
+              </div>
+
+              {/* Featured Quote */}
+              <div>
+                <label className="block text-xs font-mono text-zinc-300 mb-1">
+                  Featured Headline Quote *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={bioForm.quote}
+                  onChange={(e) => setBioForm({ ...bioForm, quote: e.target.value })}
+                  placeholder='"Design is not decoration. It is communication with commercial intent."'
+                  className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655]"
+                />
+              </div>
+
+              {/* Editorial Philosophy */}
+              <div>
+                <label className="block text-xs font-mono text-zinc-300 mb-1">
+                  Editorial Philosophy Paragraph *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={bioForm.editorialPhilosophy}
+                  onChange={(e) => setBioForm({ ...bioForm, editorialPhilosophy: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655] leading-relaxed"
+                />
+              </div>
+
+              {/* Operations & Location Paragraph */}
+              <div>
+                <label className="block text-xs font-mono text-zinc-300 mb-1">
+                  Background, Location & Operations Details *
+                </label>
+                <textarea
+                  required
+                  rows={3}
+                  value={bioForm.locationDetails}
+                  onChange={(e) => setBioForm({ ...bioForm, locationDetails: e.target.value })}
+                  className="w-full px-3 py-2 text-xs bg-[#080B0F] border border-[#1F2833] rounded-lg text-white focus:outline-none focus:border-[#FF4655] leading-relaxed"
+                />
+              </div>
+
+              {/* Actions Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-[#1F2833]">
+                <button
+                  type="button"
+                  onClick={handleResetBio}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-zinc-400 hover:text-white hover:bg-zinc-800 rounded transition-colors cursor-pointer"
+                  title="Reset bio back to default"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Reset Default</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditBioOpen(false)}
+                    className="px-3.5 py-1.5 text-xs font-mono text-zinc-400 hover:text-white bg-[#080B0F] border border-[#1F2833] rounded transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-white bg-[#FF4655] hover:bg-[#ff5a68] rounded transition-all shadow-md shadow-[#FF4655]/25 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>{bioSaveSuccess ? 'Saved!' : 'Save Bio Changes'}</span>
                   </button>
                 </div>
               </div>

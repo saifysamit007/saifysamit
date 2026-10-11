@@ -16,11 +16,12 @@ import {
   AlertCircle,
   Link as LinkIcon,
   FileImage,
+  Pencil,
 } from 'lucide-react';
 import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
-import { savePermanently, loadPermanently } from '../utils/persistentStorage';
+import { savePermanently, loadPermanently, compressImageFile } from '../utils/persistentStorage';
 
 interface HeroProps {
   onExploreWork: () => void;
@@ -63,7 +64,7 @@ const DEFAULT_HERO_BACKGROUND_IMAGES: HeroBgImage[] = [
 
 export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
   const { isAdmin } = useAdmin();
-  const { settings } = useSiteSettings();
+  const { settings, openCustomizer } = useSiteSettings();
   const copy = settings.customCopy || {};
   const [bgImages, setBgImages] = useState<HeroBgImage[]>(() => {
     try {
@@ -144,7 +145,7 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
   };
 
   // Upload an image from PC for a specific row
-  const handleRowFileUpload = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleRowFileUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -153,76 +154,57 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setModalError('Image size exceeds 10MB. Please choose a smaller image.');
-      return;
-    }
-
     setModalError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
-      if (result) {
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1920, 0.85);
+      if (compressedDataUrl) {
         const updated = [...editingList];
-        updated[index].url = result;
+        updated[index].url = compressedDataUrl;
         const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
         if (!updated[index].title || updated[index].title.startsWith('Hero Background #')) {
           updated[index].title = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
         }
         setEditingList(updated);
       }
-    };
-    reader.onerror = () => {
-      setModalError('Could not read image from PC. Please try again.');
-    };
-    reader.readAsDataURL(file);
+    } catch {
+      setModalError('Could not process image from PC. Please try again.');
+    }
     e.target.value = '';
   };
 
   // Add one or multiple images directly from PC
-  const handleBatchUploadFromPC = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleBatchUploadFromPC = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setModalError(null);
-    const newItems: HeroBgImage[] = [];
-    const validFiles = Array.from(files).filter((file) => {
-      if (!file.type.startsWith('image/')) {
-        setModalError(`"${file.name}" is not a valid image file.`);
-        return false;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        setModalError(`"${file.name}" exceeds 10MB limit and was skipped.`);
-        return false;
-      }
-      return true;
-    });
+    const validFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
 
-    if (validFiles.length === 0) return;
+    if (validFiles.length === 0) {
+      setModalError('Please select valid image files.');
+      return;
+    }
 
-    let processedCount = 0;
-    validFiles.forEach((file, i) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const result = event.target?.result as string;
-        if (result) {
+    try {
+      const processed: HeroBgImage[] = [];
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        const compressed = await compressImageFile(file, 1920, 0.85);
+        if (compressed) {
           const cleanName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-          newItems.push({
+          processed.push({
             id: `bg-${Date.now()}-${i}`,
             title: cleanName.charAt(0).toUpperCase() + cleanName.slice(1),
-            url: result,
+            url: compressed,
           });
         }
-        processedCount++;
-        if (processedCount === validFiles.length) {
-          setEditingList((prev) => [...prev, ...newItems]);
-        }
-      };
-      reader.onerror = () => {
-        processedCount++;
-      };
-      reader.readAsDataURL(file);
-    });
+      }
+      if (processed.length > 0) {
+        setEditingList((prev) => [...prev, ...processed]);
+      }
+    } catch {
+      setModalError('Could not process some images from PC.');
+    }
 
     e.target.value = '';
   };
@@ -397,16 +379,27 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
           <span className="text-[#FF4655] font-semibold">BG:</span> {bgImages[currentBgIndex]?.title || 'Hero Background'}
         </div>
 
-        {/* Change Background Images Modal Trigger (Admin / Owner Only) */}
+        {/* Change Background Images & Edit Text Modal Trigger (Admin / Owner Only) */}
         {isAdmin && (
-          <button
-            onClick={openEditModal}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:text-white bg-[#0E141B] hover:bg-[#1a232f] border border-[#1F2833] hover:border-[#FF4655] rounded transition-colors"
-            title="Change background images with custom links (Owner only)"
-          >
-            <ImageIcon className="w-3 h-3 text-[#FF4655]" />
-            <span>Change BG</span>
-          </button>
+          <>
+            <button
+              onClick={openEditModal}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:text-white bg-[#0E141B] hover:bg-[#1a232f] border border-[#1F2833] hover:border-[#FF4655] rounded transition-colors cursor-pointer"
+              title="Change background images with custom links or upload from PC (Owner only)"
+            >
+              <ImageIcon className="w-3 h-3 text-[#FF4655]" />
+              <span>Change BG</span>
+            </button>
+
+            <button
+              onClick={openCustomizer}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-mono text-zinc-300 hover:text-white bg-[#0E141B] hover:bg-[#1a232f] border border-[#1F2833] hover:border-[#FF4655] rounded transition-colors cursor-pointer"
+              title="Edit hero headline, badge, subtitle, and CTA copy"
+            >
+              <Pencil className="w-3 h-3 text-[#FF4655]" />
+              <span>Edit Text</span>
+            </button>
+          </>
         )}
 
         {/* Dot indicators */}

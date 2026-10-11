@@ -4,6 +4,7 @@
 const DB_NAME = 'SaifyPortfolioAdminDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'admin_persistent_data';
+const LOCAL_STORAGE_MAX_SAFE_BYTES = 500000; // 500KB safe ceiling for LocalStorage
 
 // Open or initialize browser IndexedDB (Unlimited multi-megabyte photo & text storage)
 function openIndexedDB(): Promise<IDBDatabase | null> {
@@ -97,20 +98,30 @@ export async function idbRemoveItem(key: string): Promise<boolean> {
 
 /**
  * Universal Permanent Save:
- * 1. Synchronously saves in LocalStorage for fast initial render
- * 2. Asynchronously backs up in browser IndexedDB (prevents 5MB quota loss for high-res pictures)
+ * 1. Safely writes to LocalStorage only if under 500KB safe quota (avoids QuotaExceededError completely)
+ * 2. Asynchronously stores in browser IndexedDB (high-capacity storage for high-res pictures & rich arrays)
  * 3. Broadcasts cross-tab window event
  */
 export async function savePermanently<T = any>(key: string, value: T): Promise<void> {
-  // 1. LocalStorage
+  // 1. LocalStorage (only for lightweight payloads to prevent QuotaExceededError)
   try {
     const serialized = typeof value === 'string' ? value : JSON.stringify(value);
-    localStorage.setItem(key, serialized);
-  } catch (err) {
-    console.warn(`LocalStorage quota reached for "${key}". Backing up to IndexedDB.`, err);
+    if (serialized.length < LOCAL_STORAGE_MAX_SAFE_BYTES) {
+      localStorage.setItem(key, serialized);
+    } else {
+      // Clear oversized item from LocalStorage to keep origin quota clean
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    }
+  } catch {
+    // Silently remove to prevent future quota crashes
+    try {
+      localStorage.removeItem(key);
+    } catch {}
   }
 
-  // 2. IndexedDB Backup
+  // 2. IndexedDB Storage (Unlimited multi-megabyte capacity)
   await idbSetItem(key, value);
 
   // 3. Broadcast update event
@@ -121,7 +132,7 @@ export async function savePermanently<T = any>(key: string, value: T): Promise<v
 
 /**
  * Universal Permanent Load:
- * Checks LocalStorage first; if missing or empty, retrieves from IndexedDB backup
+ * Checks LocalStorage first; if missing or empty, retrieves from IndexedDB
  */
 export async function loadPermanently<T = any>(key: string, fallback: T): Promise<T> {
   // 1. Try LocalStorage
@@ -135,18 +146,103 @@ export async function loadPermanently<T = any>(key: string, fallback: T): Promis
     }
   } catch {}
 
-  // 2. Try IndexedDB backup
+  // 2. Try IndexedDB
   try {
     const idbVal = await idbGetItem<T>(key);
     if (idbVal !== null && idbVal !== undefined) {
-      // Re-populate LocalStorage if it was purged
+      // Only cache back to LocalStorage if safely small (< 500KB)
       try {
         const serialized = typeof idbVal === 'string' ? idbVal : JSON.stringify(idbVal);
-        localStorage.setItem(key, serialized);
+        if (serialized.length < LOCAL_STORAGE_MAX_SAFE_BYTES) {
+          localStorage.setItem(key, serialized);
+        }
       } catch {}
       return idbVal;
     }
   } catch {}
 
   return fallback;
+}
+
+/**
+ * Automatically compresses and optimizes images uploaded from PC before storing.
+ * Scales down large raw photos/screenshots (max 1920px),
+ * converts to high-quality compressed image Data URL (~150KB-300KB instead of 10MB),
+ * maintaining sharp fidelity and preventing any browser storage warnings.
+ */
+export function compressImageFile(
+  file: File,
+  maxDimension = 1920,
+  quality = 0.85
+): Promise<string> {
+  return new Promise((resolve) => {
+    // If SVG, read as standard Data URL
+    if (file.type === 'image/svg+xml') {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const mimeType =
+          file.type === 'image/png' && file.size < 1.2 * 1024 * 1024
+            ? 'image/png'
+            : 'image/jpeg';
+        const dataUrl = canvas.toDataURL(mimeType, quality);
+        resolve(dataUrl);
+      } catch {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    };
+
+    img.src = objectUrl;
+  });
 }
