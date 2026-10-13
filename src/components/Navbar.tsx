@@ -13,10 +13,12 @@ export default function Navbar({ onContactClick }: NavbarProps) {
   const { isAdmin } = useAdmin();
   const { settings, openSectionManager } = useSiteSettings();
 
+  // Order matches the actual vertical flow in the page:
+  // Hero -> Work (#work) -> Services (#services) -> About (#about) -> Process (#process) -> Testimonials -> Contact (#contact)
   const allNavLinks: { name: string; href: string; sectionKey: SectionKey; num: string }[] = [
     { name: 'Work', href: '#work', sectionKey: 'work', num: '01' },
-    { name: 'About', href: '#about', sectionKey: 'about', num: '02' },
-    { name: 'Services', href: '#services', sectionKey: 'services', num: '03' },
+    { name: 'Services', href: '#services', sectionKey: 'services', num: '02' },
+    { name: 'About', href: '#about', sectionKey: 'about', num: '03' },
     { name: 'Process', href: '#process', sectionKey: 'process', num: '04' },
     { name: 'Contact', href: '#contact', sectionKey: 'contact', num: '05' },
   ];
@@ -27,29 +29,54 @@ export default function Navbar({ onContactClick }: NavbarProps) {
     return settings.sectionVisibility[link.sectionKey] !== false;
   });
 
-  // Track active section on scroll
+  // Track active section on scroll with robust viewport position calculation
   useEffect(() => {
-    const sectionIds = ['work', 'about', 'services', 'process', 'contact'];
+    const sectionIds = ['work', 'services', 'about', 'process', 'contact'];
+    
     const handleScroll = () => {
-      const scrollPos = window.scrollY + 160;
+      // If at very top (in Hero section), no specific sub-segment link is selected
+      if (window.scrollY < 180) {
+        setActiveSection('');
+        return;
+      }
+
+      // Check if user has scrolled to the bottom of the page (then Contact is active)
+      const windowHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+      if (window.scrollY + windowHeight >= docHeight - 80) {
+        setActiveSection('contact');
+        return;
+      }
+
+      // Viewport trigger threshold: slightly above middle of screen (35% from top)
+      const triggerY = 200;
+      let currentActive = '';
+
       for (const id of sectionIds) {
         const el = document.getElementById(id);
         if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(id);
-            return;
+          const rect = el.getBoundingClientRect();
+          // If the top of the element has reached or passed trigger line, and its bottom is still below trigger line
+          if (rect.top <= triggerY && rect.bottom > 80) {
+            currentActive = id;
           }
         }
       }
-      if (window.scrollY < 120) {
-        setActiveSection('');
+
+      if (currentActive) {
+        setActiveSection(currentActive);
       }
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    // Trigger initially and on slight delay to account for images/hydration
     handleScroll();
-    return () => window.removeEventListener('scroll', handleScroll);
+    const timeout = setTimeout(handleScroll, 300);
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      clearTimeout(timeout);
+    };
   }, []);
 
   // Lock body scroll when mobile menu is open

@@ -26,7 +26,7 @@ export default function Preloader({ onComplete }: PreloaderProps) {
     <div
       role="status"
       aria-label="Loading portfolio"
-      className={`fixed inset-0 z-40 flex flex-col items-center justify-center bg-[#080B0F] transition-opacity duration-300 ease-out pointer-events-none ${
+      className={`fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-[#080B0F] transition-opacity duration-300 ease-out pointer-events-none ${
         isFading ? 'opacity-0' : 'opacity-100'
       }`}
     >

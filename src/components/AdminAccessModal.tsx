@@ -21,6 +21,7 @@ import { useAdmin } from '../context/AdminContext';
 import { useSiteSettings, DEFAULT_FAVICON_SVG } from '../context/SiteSettingsContext';
 import SectionManagerModal from './SectionManagerModal';
 import FaviconModal from './FaviconModal';
+import ThemeCustomizerModal from './ThemeCustomizerModal';
 import Preloader from './Preloader';
 
 export default function AdminAccessModal() {
@@ -508,6 +509,9 @@ export default function AdminAccessModal() {
 
       {/* Favicon & Browser Tab Branding Customizer Modal */}
       <FaviconModal />
+
+      {/* Theme & Text/Copy Customizer Modal */}
+      <ThemeCustomizerModal />
 
       {/* Interactive Preloader Animation Preview Triggered by Admin */}
       {showPreloaderPreview && (
