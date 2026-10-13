@@ -78,6 +78,7 @@ interface DatabaseSchema {
   faviconUrl?: string | null;
   adminPasscodeHash?: string;
   siteSettings?: SiteSettingsData | null;
+  inquiries?: any[] | null;
 }
 
 const SERVER_AUTH_SECRET =
@@ -86,6 +87,43 @@ const DEFAULT_INITIAL_PASSCODE = process.env.ADMIN_PASSCODE || 'saify2026';
 
 function hashPasscode(passcode: string): string {
   return crypto.createHmac('sha256', SERVER_AUTH_SECRET).update(passcode.trim()).digest('hex');
+}
+
+function syncProjectsToSourceCode(projects: any[]) {
+  try {
+    const portfolioFilePath = path.resolve(process.cwd(), 'src/data/portfolioData.ts');
+    if (!fs.existsSync(portfolioFilePath)) return;
+    let content = fs.readFileSync(portfolioFilePath, 'utf8');
+
+    const regex = /export const PORTFOLIO_PROJECTS: ProjectItem\[\] = \[([\s\S]*?)\];/;
+    if (regex.test(content)) {
+      const serialized = JSON.stringify(projects, null, 2);
+      content = content.replace(regex, `export const PORTFOLIO_PROJECTS: ProjectItem[] = ${serialized};`);
+      fs.writeFileSync(portfolioFilePath, content, 'utf8');
+      console.log('✓ Successfully synced projects to src/data/portfolioData.ts for Vercel/GitHub');
+    }
+  } catch (err) {
+    console.error('Failed to sync projects to portfolioData.ts:', err);
+  }
+}
+
+function syncHeroBackgroundsToSourceCode(backgrounds: any[]) {
+  try {
+    const heroFilePath = path.resolve(process.cwd(), 'src/components/Hero.tsx');
+    if (!fs.existsSync(heroFilePath)) return;
+    let content = fs.readFileSync(heroFilePath, 'utf8');
+    const heroRegex = /const DEFAULT_HERO_BACKGROUND_IMAGES: HeroBgImage\[\] = \[([\s\S]*?)\];/;
+    if (heroRegex.test(content)) {
+      content = content.replace(
+        heroRegex,
+        `const DEFAULT_HERO_BACKGROUND_IMAGES: HeroBgImage[] = ${JSON.stringify(backgrounds, null, 2)};`
+      );
+      fs.writeFileSync(heroFilePath, content, 'utf8');
+      console.log('✓ Successfully synced hero backgrounds to src/components/Hero.tsx');
+    }
+  } catch (err) {
+    console.error('Failed to sync hero backgrounds to Hero.tsx:', err);
+  }
 }
 
 function initDb(): DatabaseSchema {
@@ -112,6 +150,7 @@ function initDb(): DatabaseSchema {
     artistProfile: data.artistProfile || null,
     faviconUrl: data.faviconUrl || data.siteSettings?.faviconUrl || null,
     adminPasscodeHash: data.adminPasscodeHash || hashPasscode(DEFAULT_INITIAL_PASSCODE),
+    inquiries: data.inquiries || [],
     siteSettings: {
       ...DEFAULT_SITE_SETTINGS,
       ...(data.siteSettings || {}),
@@ -427,7 +466,8 @@ app.post('/api/projects', requireAdminAuth, (req, res) => {
     if (Array.isArray(projects)) {
       db.projects = projects;
       saveDb(db);
-      return res.json({ success: true, count: projects.length });
+      syncProjectsToSourceCode(projects);
+      return res.json({ success: true, count: projects.length, syncedToCode: true });
     }
     res.status(400).json({ error: 'Projects must be an array' });
   } catch (err: any) {
@@ -452,9 +492,57 @@ app.post('/api/hero-backgrounds', requireAdminAuth, (req, res) => {
     if (Array.isArray(backgrounds)) {
       db.heroBackgrounds = backgrounds;
       saveDb(db);
-      return res.json({ success: true, count: backgrounds.length });
+      syncHeroBackgroundsToSourceCode(backgrounds);
+      return res.json({ success: true, count: backgrounds.length, syncedToCode: true });
     }
     res.status(400).json({ error: 'Backgrounds must be an array' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Universal Sync-to-Code API (Ensures Vercel static build & GitHub have latest admin edits)
+app.post('/api/sync-to-code', requireAdminAuth, (req, res) => {
+  try {
+    const { projects, heroBackgrounds } = req.body;
+    if (Array.isArray(projects)) {
+      db.projects = projects;
+      syncProjectsToSourceCode(projects);
+    }
+    if (Array.isArray(heroBackgrounds)) {
+      db.heroBackgrounds = heroBackgrounds;
+      syncHeroBackgroundsToSourceCode(heroBackgrounds);
+    }
+    saveDb(db);
+    res.json({
+      success: true,
+      message: 'Successfully written directly to TypeScript codebase (Vercel & GitHub ready)',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Inquiries REST API (Stores inquiries for admin review)
+app.get('/api/inquiries', requireAdminAuth, (req, res) => {
+  res.json({ inquiries: db.inquiries || [] });
+});
+
+app.post('/api/inquiries', (req, res) => {
+  try {
+    const inquiry = req.body;
+    if (inquiry && inquiry.name && inquiry.email) {
+      if (!Array.isArray(db.inquiries)) {
+        db.inquiries = [];
+      }
+      db.inquiries.unshift(inquiry);
+      if (db.inquiries.length > 100) {
+        db.inquiries = db.inquiries.slice(0, 100);
+      }
+      saveDb(db);
+      return res.json({ success: true });
+    }
+    res.status(400).json({ error: 'Invalid inquiry data' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

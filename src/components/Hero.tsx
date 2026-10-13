@@ -22,6 +22,7 @@ import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
 import { savePermanently, loadPermanently, compressImageFile } from '../utils/persistentStorage';
+import SmartMedia from './SmartMedia';
 
 interface HeroProps {
   onExploreWork: () => void;
@@ -37,28 +38,28 @@ export interface HeroBgImage {
 const DEFAULT_HERO_BACKGROUND_IMAGES: HeroBgImage[] = [
   {
     id: 'bg-1',
-    url: '/src/assets/images/hero_esports_branding_1790776149956.jpg',
-    title: 'Valorant Championship Key Visual',
+    url: 'https://ik.imagekit.io/pc5amjyab/TSAm%20is%20Live%20Fortnite%20Logo%200.jpg?updatedAt=1791750435027',
+    title: 'Fortnite Youtube Thumbnail',
   },
   {
     id: 'bg-2',
-    url: '/src/assets/images/esports_stage_keyart_1790780707981.jpg',
-    title: 'Grand Finals Stadium Stage Identity',
+    url: 'https://ik.imagekit.io/pc5amjyab/TSAM%20is%20Live%20Valo%20Green%200.jpg?updatedAt=1791750574725',
+    title: 'Valorant Youtube Thumbnail',
   },
   {
     id: 'bg-3',
-    url: '/src/assets/images/work_esports_tournament_1790776181826.jpg',
-    title: 'Vanguard Matchday Campaign Poster',
+    url: 'https://ik.imagekit.io/pc5amjyab/I%20need%20Ammo%200.jpg?updatedAt=1791750434563',
+    title: 'Rainbow Six Siege Youtube Thumbnail',
   },
   {
     id: 'bg-4',
-    url: '/src/assets/images/work_branding_identity_1790776168205.jpg',
-    title: 'Aura Minimalist Brand Architecture',
+    url: 'https://ik.imagekit.io/pc5amjyab/Tsam%20playing%20csgo%2001.jpg?updatedAt=1791750435133',
+    title: 'CS:GO Youtube Thumbnail',
   },
   {
     id: 'bg-5',
-    url: '/src/assets/images/work_thumbnail_design_1790776195553.jpg',
-    title: 'High-Retention Editorial Creator Graphics',
+    url: 'https://ik.imagekit.io/pc5amjyab/Happy%20Birthday%20Tsam%2016%200.jpg?updatedAt=1791750434912',
+    title: 'PUBG Youtube Thumbnail',
   },
 ];
 
@@ -267,17 +268,15 @@ export default function Hero({ onExploreWork, onContactClick }: HeroProps) {
                   : 'opacity-0 scale-105 pointer-events-none'
               }`}
             >
-              <img
+              <SmartMedia
                 src={img.url}
                 alt={img.title}
-                loading={idx === 0 ? 'eager' : 'lazy'}
-                fetchPriority={idx === 0 ? 'high' : 'low'}
-                decoding="async"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  // Fallback if image URL is invalid
-                  (e.target as HTMLImageElement).src = DEFAULT_HERO_BACKGROUND_IMAGES[0].url;
-                }}
+                priority={idx === 0}
+                autoPlay={isActive}
+                loop
+                muted
+                playsInline
+                fallbackTitle={img.title}
                 className="w-full h-full object-cover object-center"
               />
             </div>

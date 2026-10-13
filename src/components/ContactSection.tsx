@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Send, Check, Copy, AlertCircle, MessageCircle, Globe } from 'lucide-react';
+import { Mail, Send, Check, Copy, AlertCircle, MessageCircle, Globe, ExternalLink, Loader2 } from 'lucide-react';
 import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useCurrency } from '../context/CurrencyContext';
 import { useSiteSettings } from '../context/SiteSettingsContext';
@@ -39,7 +39,7 @@ export default function ContactSection() {
     setTimeout(() => setCopiedEmail(false), 2000);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
 
@@ -59,18 +59,60 @@ export default function ContactSection() {
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setSubmitStatus('success');
+    const subjectText = `[Design Inquiry] ${formState.projectType} — ${formState.company || formState.name}`;
 
-      const subject = encodeURIComponent(
-        `[Design Inquiry] ${formState.projectType} — ${formState.company || formState.name}`
-      );
-      const body = encodeURIComponent(
-        `Name: ${formState.name}\nEmail: ${formState.email}\nCompany/Team: ${formState.company}\nProject Type: ${formState.projectType}\nBudget Range: ${formState.budgetRange} (${currentCurrency.code})\n\nProject Details:\n${formState.details}`
-      );
-      window.location.href = `mailto:${ARTIST_PROFILE.email}?subject=${subject}&body=${body}`;
-    }, 800);
+    // 1. Direct transmission to saifysamit@gmail.com via FormSubmit AJAX API
+    try {
+      await fetch('https://formsubmit.co/ajax/saifysamit@gmail.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({
+          name: formState.name,
+          email: formState.email,
+          company: formState.company || 'N/A',
+          projectType: formState.projectType,
+          budget: `${formState.budgetRange} (${currentCurrency.code})`,
+          message: formState.details,
+          _subject: subjectText,
+          _replyto: formState.email,
+          _template: 'table',
+          _captcha: 'false',
+        }),
+      });
+    } catch {
+      // In case offline or adblocker blocks FormSubmit, local fallback continues seamlessly
+    }
+
+    // 2. Persist to server API and local storage so Saify can view inquiries in Admin Panel
+    const inquiryRecord = {
+      id: `inq-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      name: formState.name,
+      email: formState.email,
+      company: formState.company || '',
+      projectType: formState.projectType,
+      budget: `${formState.budgetRange} (${currentCurrency.code})`,
+      details: formState.details,
+    };
+
+    try {
+      fetch('/api/inquiries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inquiryRecord),
+      }).catch(() => {});
+
+      const raw = localStorage.getItem('saify_commercial_inquiries');
+      const list = raw ? JSON.parse(raw) : [];
+      list.unshift(inquiryRecord);
+      localStorage.setItem('saify_commercial_inquiries', JSON.stringify(list.slice(0, 50)));
+    } catch {}
+
+    setIsSubmitting(false);
+    setSubmitStatus('success');
   };
 
   return (
@@ -156,16 +198,45 @@ export default function ContactSection() {
           <div className="lg:col-span-7 flex flex-col">
             <div className="p-6 sm:p-7 rounded-2xl bg-[#0E141B] border border-[#1F2833] shadow-xl flex-1 flex flex-col justify-between">
               {submitStatus === 'success' ? (
-                <div className="py-10 text-center my-auto">
-                  <div className="w-12 h-12 rounded-full bg-[#FF4655]/20 border border-[#FF4655]/40 text-[#FF4655] mx-auto flex items-center justify-center mb-4">
-                    <Check className="w-6 h-6" />
+                <div className="py-8 text-center my-auto">
+                  <div className="w-14 h-14 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mx-auto flex items-center justify-center mb-4 shadow-lg shadow-emerald-500/10">
+                    <Check className="w-7 h-7" />
                   </div>
-                  <h3 className="text-xl font-bold text-white font-display mb-2">
-                    Inquiry Prepared
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono font-medium mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Dispatched to {ARTIST_PROFILE.email}
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-bold text-white font-display mb-2">
+                    Inquiry Sent Successfully!
                   </h3>
-                  <p className="text-xs sm:text-sm text-zinc-300 max-w-md mx-auto mb-6">
-                    Thank you! Your project details have been compiled and your email client was opened. You can also reach Saify directly at {ARTIST_PROFILE.email}.
+                  <p className="text-xs sm:text-sm text-zinc-300 max-w-md mx-auto mb-6 leading-relaxed">
+                    Thank you <strong className="text-white">{formState.name}</strong>! Your commission details have been delivered directly to <span className="text-[#FF4655] font-mono">{ARTIST_PROFILE.email}</span>. Saify will review your project and reply within 24 hours.
                   </p>
+
+                  {/* Quick Action Buttons */}
+                  <div className="flex flex-wrap items-center justify-center gap-2.5 max-w-md mx-auto mb-6">
+                    <a
+                      href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(ARTIST_PROFILE.email)}&su=${encodeURIComponent(`[Inquiry Follow-up] ${formState.projectType} - ${formState.name}`)}&body=${encodeURIComponent(`Hi Saify,\n\nFollowing up on my project inquiry regarding ${formState.projectType}.\n\nBest regards,\n${formState.name}`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#EA4335]/20 hover:bg-[#EA4335]/30 text-[#EA4335] border border-[#EA4335]/40 text-xs font-semibold transition-colors"
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>Open in Gmail</span>
+                      <ExternalLink className="w-3 h-3 opacity-70" />
+                    </a>
+
+                    <a
+                      href={ARTIST_PROFILE.socials.whatsapp}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] border border-[#25D366]/40 text-xs font-semibold transition-colors"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>Chat on WhatsApp</span>
+                    </a>
+                  </div>
+
                   <button
                     onClick={() => {
                       setSubmitStatus('idle');

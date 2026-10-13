@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { ArrowUpRight, Eye, Pencil, Trash2, Images, ZoomIn } from 'lucide-react';
 import { ProjectItem } from '../data/portfolioData';
+import SmartMedia from './SmartMedia';
 
 interface ProjectCardProps {
   project: ProjectItem;
@@ -89,12 +90,10 @@ export default function ProjectCard({ project, onSelect, onEdit, onDelete }: Pro
 
       {/* Main Image Container */}
       <div className={`relative w-full ${aspectClass} overflow-hidden bg-black`}>
-        <img
+        <SmartMedia
           src={project.thumbnail}
           alt={project.title}
-          loading="lazy"
-          decoding="async"
-          referrerPolicy="no-referrer"
+          fallbackTitle={project.title}
           className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
         />
 

@@ -138,8 +138,6 @@ export default function Services({ onSelectService }: ServicesProps) {
       .catch(() => {});
   }, []);
 
-  const [activeServiceId, setActiveServiceId] = useState<string>(SERVICES_DATA[0].id);
-
   // Modal State for Add & Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
@@ -362,18 +360,11 @@ export default function Services({ onSelectService }: ServicesProps) {
 
         {/* Services List / Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {servicesList.map((service) => {
-            const isHovered = activeServiceId === service.id;
-            return (
-              <div
-                key={service.id}
-                onMouseEnter={() => setActiveServiceId(service.id)}
-                className={`p-7 rounded-2xl border transition-all duration-300 flex flex-col justify-between group relative ${
-                  isHovered
-                    ? 'bg-[#0E141B] border-[#FF4655]/60 shadow-xl shadow-[#FF4655]/10'
-                    : 'bg-[#0B1017] border-[#1F2833] hover:border-[#FF4655]/40'
-                }`}
-              >
+          {servicesList.map((service) => (
+            <div
+              key={service.id}
+              className="p-7 rounded-2xl border transition-all duration-300 flex flex-col justify-between group relative bg-[#0B1017] hover:bg-[#0E141B] border-[#1F2833] hover:border-[#FF4655]/60 hover:shadow-xl hover:shadow-[#FF4655]/10"
+            >
                 <div>
                   {/* Top Bar: Index + Software Logos + Admin Edit/Delete */}
                   <div className="flex items-center justify-between mb-5">
@@ -453,8 +444,7 @@ export default function Services({ onSelectService }: ServicesProps) {
                   </a>
                 </div>
               </div>
-            );
-          })}
+            ))}
         </div>
       </div>
 

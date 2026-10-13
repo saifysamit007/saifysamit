@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Lock,
   Unlock,
@@ -16,9 +16,18 @@ import {
   Globe,
   Zap,
   Type,
+  Cloud,
+  Download,
+  Copy,
+  Inbox,
+  RefreshCw,
+  Mail,
+  ExternalLink,
+  MessageSquare,
 } from 'lucide-react';
-import { useAdmin } from '../context/AdminContext';
+import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import { useSiteSettings, DEFAULT_FAVICON_SVG } from '../context/SiteSettingsContext';
+import { ARTIST_PROFILE } from '../data/portfolioData';
 import SectionManagerModal from './SectionManagerModal';
 import FaviconModal from './FaviconModal';
 import ThemeCustomizerModal from './ThemeCustomizerModal';
@@ -54,6 +63,100 @@ export default function AdminAccessModal() {
   const [newPass, setNewPass] = useState('');
   const [changeStatus, setChangeStatus] = useState<{ success: boolean; msg: string } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [copiedData, setCopiedData] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
+
+  // Inquiries & Vercel Code Sync State
+  const [inquiries, setInquiries] = useState<any[]>(() => {
+    try {
+      const raw = localStorage.getItem('saify_commercial_inquiries');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showInquiriesModal, setShowInquiriesModal] = useState(false);
+  const [syncingCode, setSyncingCode] = useState(false);
+  const [syncSuccess, setSyncSuccess] = useState(false);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetch('/api/inquiries', { headers: getAdminAuthHeaders() })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.inquiries && Array.isArray(data.inquiries)) {
+            setInquiries(data.inquiries);
+            localStorage.setItem('saify_commercial_inquiries', JSON.stringify(data.inquiries));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAdmin]);
+
+  const getExportableData = () => {
+    let projects = [];
+    try {
+      const savedP = localStorage.getItem('saify_portfolio_projects_custom');
+      if (savedP) projects = JSON.parse(savedP);
+    } catch {}
+
+    let heroBackgrounds = [];
+    try {
+      const savedH = localStorage.getItem('saify_hero_bg_images');
+      if (savedH) heroBackgrounds = JSON.parse(savedH);
+    } catch {}
+
+    return {
+      exportedAt: new Date().toISOString(),
+      projects: projects.length > 0 ? projects : null,
+      heroBackgrounds: heroBackgrounds.length > 0 ? heroBackgrounds : null,
+      siteSettings: settings,
+    };
+  };
+
+  const handleSyncToCode = async () => {
+    setSyncingCode(true);
+    try {
+      const data = getExportableData();
+      const res = await fetch('/api/sync-to-code', {
+        method: 'POST',
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify({
+          projects: data.projects,
+          heroBackgrounds: data.heroBackgrounds,
+        }),
+      });
+      if (res.ok) {
+        setSyncSuccess(true);
+        setTimeout(() => setSyncSuccess(false), 3000);
+      }
+    } catch {
+    } finally {
+      setSyncingCode(false);
+    }
+  };
+
+  const handleDownloadBackup = () => {
+    const data = getExportableData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `saify-portfolio-data-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDownloadSuccess(true);
+    setTimeout(() => setDownloadSuccess(false), 2000);
+  };
+
+  const handleCopyData = async () => {
+    const data = getExportableData();
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+      setCopiedData(true);
+      setTimeout(() => setCopiedData(false), 2000);
+    } catch {}
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -347,6 +450,113 @@ export default function AdminAccessModal() {
                   </div>
                 </div>
 
+                {/* Inquiries Inbox Card */}
+                <div className="p-3 rounded-xl bg-[#080B0F] border border-zinc-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded bg-[#16191E] border border-zinc-700 flex items-center justify-center text-[#FF4655] shrink-0">
+                      <Inbox className="w-3.5 h-3.5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-mono font-bold text-white block">
+                          Commission Inquiries Inbox
+                        </span>
+                        {inquiries.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FF4655]/20 text-[#FF4655] border border-[#FF4655]/30">
+                            {inquiries.length} received
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-zinc-400 font-mono">
+                        Direct inquiries sent to saifysamit@gmail.com
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowInquiriesModal(true)}
+                    className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-[#141B24] hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    <Mail className="w-3.5 h-3.5 text-[#FF4655]" />
+                    <span>View Inbox ({inquiries.length})</span>
+                  </button>
+                </div>
+
+                {/* Vercel Live Deployment & Data Sync Center */}
+                <div className="p-3.5 rounded-xl bg-[#080B0F] border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded bg-[#16191E] border border-zinc-700 flex items-center justify-center text-[#FF4655] shrink-0">
+                        <Cloud className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-mono font-bold text-white block">
+                            Vercel Live Code Sync & Backup
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80">
+                            VERCEL READY
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-mono">
+                          ImageKit media supported · Direct code synchronization
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-zinc-300 font-mono leading-relaxed bg-[#0E141B] p-2.5 rounded-lg border border-[#1F2833]">
+                    💡 <strong>Vercel এ লাইভ দেখানোর নিয়ম:</strong> Vercel স্ট্যাটিক সাইট হওয়ায় নিচের <span className="text-[#FF4655] font-semibold">"Sync to Codebase"</span> বাটনে ক্লিক করলে আপনার সব কার্ড, ইমেজ ও ব্যাকগ্রাউন্ড সরাসরি সোর্স কোডে (<code className="text-zinc-200">portfolioData.ts</code>) সেভ হয়ে যাবে। এরপর গিটহাবে পুশ করলেই Vercel-এ তাৎক্ষণিক শো করবে!
+                  </div>
+
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleSyncToCode}
+                      disabled={syncingCode}
+                      className="w-full py-2 px-3 text-xs font-mono font-bold uppercase tracking-wider bg-[#FF4655] hover:bg-[#ff5a68] disabled:opacity-50 text-white rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#FF4655]/20"
+                    >
+                      {syncingCode ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Syncing to TypeScript Codebase...</span>
+                        </>
+                      ) : syncSuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-white" />
+                          <span>✓ Synced to Codebase! Ready for GitHub/Vercel</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Sync to Codebase (Auto-Write portfolioData.ts)</span>
+                        </>
+                      )}
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDownloadBackup}
+                        className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-[#141B24] hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#FF4655]" />
+                        <span>{downloadSuccess ? 'Downloaded!' : 'Export db.json'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyData}
+                        className="px-2.5 py-1.5 text-xs font-mono font-semibold bg-[#141B24] hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700 rounded-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-[#FF4655]" />
+                        <span>{copiedData ? 'Copied!' : 'Copy JSON Data'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Change Passcode Accordion */}
                 <div className="pt-2 border-t border-[#1F2833]">
                   {!showChangePass ? (
@@ -500,6 +710,90 @@ export default function AdminAccessModal() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Client Inquiries Inbox Modal */}
+      {showInquiriesModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in">
+          <div className="bg-[#0E141B] border border-[#1F2833] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-[#1F2833] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#FF4655]/10 border border-[#FF4655]/30 flex items-center justify-center text-[#FF4655]">
+                  <Inbox className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white font-display">Client Inquiries Inbox</h3>
+                  <span className="text-[11px] font-mono text-zinc-400">All submissions dispatched to {ARTIST_PROFILE.email}</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInquiriesModal(false)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5">
+              {inquiries.length === 0 ? (
+                <div className="text-center py-12 text-zinc-500 font-mono text-xs">
+                  No inquiries received yet. When clients fill out the Commission section, they will appear here and in your email!
+                </div>
+              ) : (
+                inquiries.map((inq: any, i: number) => (
+                  <div key={inq.id || i} className="p-4 rounded-xl bg-[#080B0F] border border-zinc-800 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">{inq.name}</h4>
+                        <span className="text-xs font-mono text-[#FF4655]">{inq.email}</span>
+                        {inq.company && inq.company !== 'N/A' && (
+                          <span className="text-xs text-zinc-400 block font-mono">Company: {inq.company}</span>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded">
+                          {inq.projectType || 'Commercial'}
+                        </span>
+                        <div className="text-[10px] text-zinc-500 font-mono mt-1">
+                          {inq.createdAt ? new Date(inq.createdAt).toLocaleDateString() : 'Recent'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-xs font-mono text-zinc-400">
+                      Budget: <span className="text-white font-semibold">{inq.budget}</span>
+                    </div>
+                    <p className="text-xs text-zinc-300 bg-[#0E141B] p-2.5 rounded-lg border border-[#1F2833] whitespace-pre-wrap font-sans leading-relaxed">
+                      {inq.details || inq.message}
+                    </p>
+                    <div className="flex items-center gap-2 pt-1">
+                      <a
+                        href={`https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(inq.email)}&su=${encodeURIComponent(`Re: [Commission Inquiry] ${inq.projectType || 'Project'}`)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#EA4335]/20 hover:bg-[#EA4335]/30 text-[#EA4335] border border-[#EA4335]/40 text-xs font-semibold transition-colors"
+                      >
+                        <Mail className="w-3 h-3" />
+                        <span>Reply in Gmail</span>
+                        <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(inq.email);
+                        }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[#141B24] hover:bg-zinc-800 text-zinc-300 text-xs font-mono transition-colors border border-zinc-700 cursor-pointer"
+                      >
+                        <Copy className="w-3 h-3 text-[#FF4655]" />
+                        <span>Copy Email</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

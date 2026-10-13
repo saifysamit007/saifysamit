@@ -5,6 +5,7 @@ import ProjectCard from './ProjectCard';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
+import SmartMedia from './SmartMedia';
 
 interface SelectedWorkProps {
   onSelectProject: (project: ProjectItem) => void;
@@ -703,27 +704,27 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
               <div className="p-3 sm:p-4 rounded-xl bg-[#080B0F] border border-[#1F2833] space-y-2.5">
                 <label className="text-xs font-mono text-white font-semibold flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#FF4655]" />
-                  <span>Main Cover Image URL * (Primary Card Visual)</span>
+                  <span>Main Cover Media URL * (Direct ImageKit Link, MP4 Video, JPG, PNG)</span>
                 </label>
 
                 <input
                   type="url"
                   required
-                  placeholder="https://... direct image link"
+                  placeholder="https://ik.imagekit.io/... or https://... image or video link"
                   value={formMainImage}
                   onChange={(e) => setFormMainImage(e.target.value)}
                   className="w-full px-3 py-2 text-xs bg-[#0E141B] border border-[#1F2833] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
                 />
 
                 {formMainImage && (
-                  <div className="relative w-full h-32 sm:h-40 rounded-lg overflow-hidden border border-[#1F2833] bg-black">
-                    <img
+                  <div className="relative w-full h-36 sm:h-44 rounded-lg overflow-hidden border border-[#1F2833] bg-black">
+                    <SmartMedia
                       src={formMainImage}
                       alt="Cover Preview"
-                      referrerPolicy="no-referrer"
+                      fallbackTitle="Cover Preview"
                       className="w-full h-full object-cover"
                     />
-                    <span className="absolute bottom-2 left-2 text-[10px] font-mono bg-black/80 text-[#FF4655] px-2 py-0.5 rounded border border-[#FF4655]/40">
+                    <span className="absolute bottom-2 left-2 text-[10px] font-mono bg-black/80 text-[#FF4655] px-2 py-0.5 rounded border border-[#FF4655]/40 pointer-events-none">
                       MAIN COVER PREVIEW
                     </span>
                   </div>
@@ -734,13 +735,13 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
               <div className="p-3 sm:p-4 rounded-xl bg-[#080B0F] border border-[#1F2833] space-y-2.5">
                 <label className="text-xs font-mono text-white font-semibold flex items-center gap-1.5">
                   <Images className="w-3.5 h-3.5 text-[#FF4655]" />
-                  <span>Additional Gallery Views ({formGalleryImages.length} images)</span>
+                  <span>Additional Gallery Views ({formGalleryImages.length} items - Images or Videos)</span>
                 </label>
 
                 <div className="flex gap-2">
                   <input
                     type="url"
-                    placeholder="Paste additional gallery image URL..."
+                    placeholder="Paste additional image or video URL (ImageKit, MP4)..."
                     value={newGalleryInput}
                     onChange={(e) => setNewGalleryInput(e.target.value)}
                     className="flex-1 px-3 py-2 text-xs bg-[#0E141B] border border-[#1F2833] rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:border-[#FF4655]"
@@ -761,7 +762,7 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
                         key={idx}
                         className="relative group rounded-lg overflow-hidden border border-[#1F2833] h-18 sm:h-20 bg-black"
                       >
-                        <img
+                        <SmartMedia
                           src={img}
                           alt={`Gallery view ${idx + 1}`}
                           className="w-full h-full object-cover"

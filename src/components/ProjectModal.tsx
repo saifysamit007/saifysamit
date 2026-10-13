@@ -23,6 +23,7 @@ import {
 import { ProjectItem } from '../data/portfolioData';
 import { useAdmin } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import SmartMedia, { isVideoUrl, normalizeMediaUrl } from './SmartMedia';
 
 interface ProjectModalProps {
   project: ProjectItem | null;
@@ -527,13 +528,24 @@ export default function ProjectModal({
                     transition: isDragging ? 'none' : 'transform 0.15s ease-out',
                   }}
                 >
-                  <img
-                    src={currentImage}
-                    alt={project.title}
-                    draggable={false}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-auto max-h-[640px] object-contain mx-auto bg-black pointer-events-none"
-                  />
+                  {isVideoUrl(currentImage) ? (
+                    <video
+                      src={normalizeMediaUrl(currentImage)}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="w-full h-auto max-h-[640px] object-contain mx-auto bg-black"
+                    />
+                  ) : (
+                    <img
+                      src={normalizeMediaUrl(currentImage)}
+                      alt={project.title}
+                      draggable={false}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="w-full h-auto max-h-[640px] object-contain mx-auto bg-black pointer-events-none"
+                    />
+                  )}
                 </div>
 
                 {/* Floating Tag over Image */}
@@ -595,7 +607,7 @@ export default function ProjectModal({
                               : 'border-[#1F2833] hover:border-zinc-500 opacity-70 hover:opacity-100'
                           }`}
                         >
-                          <img
+                          <SmartMedia
                             src={img}
                             alt={`View ${i + 1}`}
                             className="w-full h-full object-cover"
@@ -880,7 +892,7 @@ export default function ProjectModal({
                         : 'border-zinc-700 opacity-60 hover:opacity-100'
                     }`}
                   >
-                    <img src={img} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
+                    <SmartMedia src={img} alt={`Thumb ${i + 1}`} className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
