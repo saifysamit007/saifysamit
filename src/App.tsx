@@ -23,6 +23,7 @@ import NotFoundPage from './components/NotFoundPage';
 import { CurrencyProvider } from './context/CurrencyContext';
 import { AdminProvider, useAdmin, getAdminAuthHeaders } from './context/AdminContext';
 import { SiteSettingsProvider, useSiteSettings } from './context/SiteSettingsContext';
+import { deleteProjectFromFirestore } from './firebase';
 import AdminAccessModal from './components/AdminAccessModal';
 import { PORTFOLIO_PROJECTS, ProjectItem } from './data/portfolioData';
 
@@ -114,6 +115,7 @@ function AppContent() {
   };
 
   const handleDeleteProject = (project: ProjectItem) => {
+    deleteProjectFromFirestore(project.id).catch((err) => console.warn('Firestore delete notice:', err));
     const currentList = getCurrentProjects();
     const updated = currentList.filter((p) => p.id !== project.id);
     try {

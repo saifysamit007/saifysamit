@@ -1,0 +1,73 @@
+{
+  "entities": {
+    "Project": {
+      "title": "Project",
+      "description": "Portfolio project item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "client": { "type": "string" },
+        "clientType": { "type": "string" },
+        "year": { "type": "string" },
+        "role": { "type": "string" },
+        "shortDescription": { "type": "string" },
+        "thumbnail": { "type": "string" },
+        "aspectRatio": { "type": "string" },
+        "overview": { "type": "string" },
+        "challenge": { "type": "string" },
+        "approach": { "type": "string" },
+        "solution": { "type": "string" },
+        "tools": { "type": "array" },
+        "deliverables": { "type": "array" },
+        "gallery": { "type": "array" },
+        "featuredInHero": { "type": "boolean" },
+        "thumbnailType": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "thumbnail"]
+    },
+    "HeroBackground": {
+      "title": "HeroBackground",
+      "description": "Hero background media item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "url": { "type": "string" },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "url"]
+    },
+    "Inquiry": {
+      "title": "Inquiry",
+      "description": "Client commission inquiry submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "company": { "type": "string" },
+        "projectType": { "type": "string" },
+        "budget": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "email", "details"]
+    }
+  },
+  "firestore": {
+    "/projects/{projectId}": {
+      "schema": { "$ref": "#/entities/Project" },
+      "description": "Collection of commercial portfolio projects"
+    },
+    "/heroBackgrounds/{bgId}": {
+      "schema": { "$ref": "#/entities/HeroBackground" },
+      "description": "Collection of hero background images and videos"
+    },
+    "/inquiries/{inquiryId}": {
+      "schema": { "$ref": "#/entities/Inquiry" },
+      "description": "Collection of commission inquiries from visitors"
+    }
+  }
+}

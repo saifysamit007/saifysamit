@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Plus, SlidersHorizontal, Check, X, Sparkles, Loader2, Image as ImageIcon, Trash2, RotateCcw, Images, Gamepad2, Cpu, Video, Upload, FileImage, Link as LinkIcon } from 'lucide-react';
+import { Plus, SlidersHorizontal, Check, X, Sparkles, Loader2, Image as ImageIcon, Trash2, RotateCcw, Images, Gamepad2, Cpu, Video, Upload, FileImage, Link as LinkIcon, Cloud } from 'lucide-react';
 import { PORTFOLIO_PROJECTS, ProjectItem } from '../data/portfolioData';
 import ProjectCard from './ProjectCard';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
 import SmartMedia from './SmartMedia';
+import { subscribeToProjects, saveProjectToFirestore, deleteProjectFromFirestore, seedInitialProjectsIfEmpty } from '../firebase';
 
 interface SelectedWorkProps {
   onSelectProject: (project: ProjectItem) => void;
@@ -32,11 +33,23 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
     return PORTFOLIO_PROJECTS;
   });
 
-  // Sync with permanent storage and server database
+  // Sync with Firestore real-time cloud database, permanent local storage, and server database
   useEffect(() => {
+    // 1. Seed initial projects to Firestore if cloud database is empty
+    seedInitialProjectsIfEmpty(PORTFOLIO_PROJECTS);
+
+    // 2. Real-time Cloud Synchronization (Instantly updates across Vercel, mobile, and all visitors)
+    const unsubscribe = subscribeToProjects((cloudProjects) => {
+      if (cloudProjects && cloudProjects.length > 0) {
+        setProjectsList(cloudProjects);
+        savePermanently('saify_portfolio_projects_custom', cloudProjects);
+      }
+    });
+
+    // 3. Fallback from local storage or server
     loadPermanently<ProjectItem[]>('saify_portfolio_projects_custom', []).then((loaded) => {
       if (loaded && loaded.length > 0) {
-        setProjectsList(loaded);
+        setProjectsList((prev) => (prev.length > 0 ? prev : loaded));
       }
     });
 
@@ -47,11 +60,12 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
       })
       .then((data) => {
         if (data?.projects && Array.isArray(data.projects) && data.projects.length > 0) {
-          setProjectsList(data.projects);
+          setProjectsList((prev) => (prev.length > 0 ? prev : data.projects));
           savePermanently('saify_portfolio_projects_custom', data.projects);
         }
       })
       .catch(() => {});
+
     const handleProjectsUpdated = (e: any) => {
       if (e.detail && Array.isArray(e.detail)) {
         setProjectsList(e.detail);
@@ -60,6 +74,7 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
     window.addEventListener('saify_projects_updated', handleProjectsUpdated);
 
     return () => {
+      unsubscribe();
       window.removeEventListener('saify_projects_updated', handleProjectsUpdated);
     };
   }, []);
@@ -353,10 +368,20 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
 
     setProjectsList(updated);
 
-    // Save to permanent multi-layer storage (IndexedDB + LocalStorage)
+    // 1. Save to Firestore Real-Time Cloud Database (Instant live sync across Vercel and all visitors)
+    if (editingProjectId) {
+      const targetProject = updated.find((p) => p.id === editingProjectId);
+      if (targetProject) {
+        saveProjectToFirestore(targetProject).catch((err) => console.warn('Firestore save notice:', err));
+      }
+    } else if (updated.length > 0) {
+      saveProjectToFirestore(updated[0]).catch((err) => console.warn('Firestore save notice:', err));
+    }
+
+    // 2. Save to permanent multi-layer storage (IndexedDB + LocalStorage)
     savePermanently('saify_portfolio_projects_custom', updated);
 
-    // Save to zero-token free server database
+    // 3. Save to server database (and auto-sync to codebase)
     fetch('/api/projects', {
       method: 'POST',
       headers: getAdminAuthHeaders(),
@@ -406,6 +431,9 @@ export default function SelectedWork({ onSelectProject }: SelectedWorkProps) {
 
     if (deleteConfirm.type === 'project' && deleteConfirm.projectId) {
       const targetId = deleteConfirm.projectId;
+      // Delete from Firestore Real-Time Cloud Database
+      deleteProjectFromFirestore(targetId).catch((err) => console.warn('Firestore delete notice:', err));
+
       const updated = projectsList.filter((p) => p.id !== targetId);
       setProjectsList(updated);
       savePermanently('saify_portfolio_projects_custom', updated);

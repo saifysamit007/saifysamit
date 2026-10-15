@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 interface PreloaderProps {
   onComplete?: () => void;
@@ -7,6 +8,7 @@ interface PreloaderProps {
 export default function Preloader({ onComplete }: PreloaderProps) {
   const [isVisible, setIsVisible] = useState(true);
   const [isFading, setIsFading] = useState(false);
+  const { settings } = useSiteSettings();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -31,6 +33,15 @@ export default function Preloader({ onComplete }: PreloaderProps) {
       }`}
     >
       <div className="flex flex-col items-center text-center px-4">
+        {settings.faviconUrl && (
+          <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#0E141B] border border-[#FF4655]/60 shadow-2xl shadow-[#FF4655]/30 flex items-center justify-center p-2.5 mb-4 animate-pulse">
+            <img
+              src={settings.faviconUrl}
+              alt="Brand Favicon"
+              className="w-full h-full object-contain"
+            />
+          </div>
+        )}
         <span className="text-xs uppercase tracking-[0.3em] text-[#FF4655] font-mono mb-3">
           PORTFOLIO ARCHIVE · VALORANT RED EDITION
         </span>

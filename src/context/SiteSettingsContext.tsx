@@ -357,33 +357,51 @@ export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ 
     };
   }, []);
 
-  // Dynamically update document <link rel="icon"> and apple-touch-icon in real-time
+  // Dynamically update document <link rel="icon">, shortcut icon, and apple-touch-icon in real-time
   useEffect(() => {
     const faviconUrl = settings.faviconUrl || DEFAULT_FAVICON_SVG;
     try {
       const existingIcons = document.querySelectorAll("link[rel*='icon']");
       existingIcons.forEach((el) => el.remove());
 
+      const cleanPath = faviconUrl.split('?')[0].split('#')[0].toLowerCase();
+      let mimeType = '';
+      if (cleanPath.endsWith('.svg') || faviconUrl.startsWith('data:image/svg')) {
+        mimeType = 'image/svg+xml';
+      } else if (cleanPath.endsWith('.png') || faviconUrl.startsWith('data:image/png')) {
+        mimeType = 'image/png';
+      } else if (cleanPath.endsWith('.ico') || faviconUrl.startsWith('data:image/x-icon')) {
+        mimeType = 'image/x-icon';
+      } else if (cleanPath.endsWith('.webp')) {
+        mimeType = 'image/webp';
+      } else if (
+        cleanPath.endsWith('.jpg') ||
+        cleanPath.endsWith('.jpeg') ||
+        faviconUrl.startsWith('data:image/jpeg')
+      ) {
+        mimeType = 'image/jpeg';
+      }
+
+      // Add cache-busting timestamp for external URLs so browser tab instantly switches icon
+      const timestamp = Date.now();
+      const tabHref = faviconUrl.startsWith('data:')
+        ? faviconUrl
+        : faviconUrl.includes('?')
+        ? `${faviconUrl}&v=${timestamp}`
+        : `${faviconUrl}?v=${timestamp}`;
+
       const link = document.createElement('link');
       link.id = 'app-favicon';
       link.rel = 'icon';
-
-      if (faviconUrl.startsWith('data:image/svg')) {
-        link.type = 'image/svg+xml';
-      } else if (faviconUrl.endsWith('.png') || faviconUrl.startsWith('data:image/png')) {
-        link.type = 'image/png';
-      } else if (
-        faviconUrl.endsWith('.jpg') ||
-        faviconUrl.endsWith('.jpeg') ||
-        faviconUrl.startsWith('data:image/jpeg')
-      ) {
-        link.type = 'image/jpeg';
-      } else if (faviconUrl.endsWith('.ico') || faviconUrl.startsWith('data:image/x-icon')) {
-        link.type = 'image/x-icon';
-      }
-
-      link.href = faviconUrl;
+      if (mimeType) link.type = mimeType;
+      link.href = tabHref;
       document.head.appendChild(link);
+
+      const shortcutLink = document.createElement('link');
+      shortcutLink.rel = 'shortcut icon';
+      if (mimeType) shortcutLink.type = mimeType;
+      shortcutLink.href = tabHref;
+      document.head.appendChild(shortcutLink);
 
       const appleLink = document.createElement('link');
       appleLink.rel = 'apple-touch-icon';

@@ -50,34 +50,52 @@ export default function ThemeInjector() {
       --color-valorant-red: ${primary};
     }
 
-    /* Primary Accent Color Overrides for Tailwind hardcoded values */
-    [class*="text-[#FF4655]"],
+    /* Primary Accent Color Overrides for Tailwind hardcoded values - BASE ONLY */
+    [class~="text-[#FF4655]"],
+    [class*=" text-[#FF4655]"],
+    [class^="text-[#FF4655]"],
     .text-\\[\\#FF4655\\] {
       color: ${primary} !important;
     }
 
-    [class*="bg-[#FF4655]"],
+    [class~="bg-[#FF4655]"],
+    [class*=" bg-[#FF4655]"],
+    [class^="bg-[#FF4655]"],
     .bg-\\[\\#FF4655\\] {
       background-color: ${primary} !important;
     }
 
-    [class*="border-[#FF4655]"],
+    [class~="border-[#FF4655]"],
+    [class*=" border-[#FF4655]"],
+    [class^="border-[#FF4655]"],
     .border-\\[\\#FF4655\\] {
       border-color: ${primary} !important;
     }
 
-    [class*="fill-[#FF4655]"],
+    [class~="fill-[#FF4655]"],
+    [class*=" fill-[#FF4655]"],
+    [class^="fill-[#FF4655]"],
     .fill-\\[\\#FF4655\\] {
       fill: ${primary} !important;
     }
 
+    /* Hover and Focus pseudo states - MUST ONLY apply during active :hover or :focus */
     [class*="hover:bg-[#ff5a68]"]:hover,
-    [class*="hover:bg-[#ff5e6c]"]:hover {
+    [class*="hover:bg-[#ff5e6c]"]:hover,
+    [class*="hover:bg-[#FF4655]"]:hover {
       background-color: ${hover} !important;
     }
 
     [class*="hover:text-[#FF4655]"]:hover {
       color: ${hover} !important;
+    }
+
+    .group:hover [class*="group-hover:text-[#FF4655]"] {
+      color: ${hover} !important;
+    }
+
+    .group:hover [class*="group-hover:border-[#FF4655]"] {
+      border-color: ${primary} !important;
     }
 
     [class*="hover:border-[#FF4655]"]:hover {
@@ -88,8 +106,15 @@ export default function ThemeInjector() {
       border-color: ${primary} !important;
     }
 
-    /* Glow & Shadow Effects */
-    [class*="shadow-[#FF4655]"] {
+    /* Glow & Shadow Effects - base only, NOT hover:shadow */
+    [class~="shadow-[#FF4655]"],
+    [class*=" shadow-[#FF4655]"],
+    [class^="shadow-[#FF4655]"] {
+      --tw-shadow-color: ${glow} !important;
+      box-shadow: 0 10px 25px -5px ${glow} !important;
+    }
+
+    [class*="hover:shadow-[#FF4655]"]:hover {
       --tw-shadow-color: ${glow} !important;
       box-shadow: 0 10px 25px -5px ${glow} !important;
     }

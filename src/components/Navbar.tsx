@@ -232,20 +232,30 @@ export default function Navbar({ onContactClick }: NavbarProps) {
           {/* Zone 1: Distinct 3D Animated Logo Emblem + 3D Extruded Floating Text */}
           <a
             href="#"
-            className="animated-3d-brand font-black tracking-wider text-white hover:text-[#FF4655] transition-colors font-display whitespace-nowrap py-1 group shrink-0 min-w-0"
+            className="animated-3d-brand font-black tracking-wider text-white hover:text-[#FF4655] transition-colors font-display whitespace-nowrap py-1 group shrink-0 min-w-0 flex items-center gap-2 sm:gap-2.5"
             aria-label="Saify Samit home"
           >
-            {/* Live 3D Rotating Isometric Cube */}
-            <div className="cube-container-3d">
-              <div className="cube-3d">
-                <div className="cube-face cube-face-front" />
-                <div className="cube-face cube-face-back" />
-                <div className="cube-face cube-face-right" />
-                <div className="cube-face cube-face-left" />
-                <div className="cube-face cube-face-top" />
-                <div className="cube-face cube-face-bottom" />
+            {settings.faviconUrl ? (
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg overflow-hidden bg-[#0A0E14] border border-[#FF4655]/60 shadow-md shadow-[#FF4655]/20 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:border-[#FF4655] transition-all p-0.5">
+                <img
+                  src={settings.faviconUrl}
+                  alt="Brand Favicon"
+                  className="w-full h-full object-contain rounded-xs"
+                />
               </div>
-            </div>
+            ) : (
+              /* Live 3D Rotating Isometric Cube */
+              <div className="cube-container-3d">
+                <div className="cube-3d">
+                  <div className="cube-face cube-face-front" />
+                  <div className="cube-face cube-face-back" />
+                  <div className="cube-face cube-face-right" />
+                  <div className="cube-face cube-face-left" />
+                  <div className="cube-face cube-face-top" />
+                  <div className="cube-face cube-face-bottom" />
+                </div>
+              </div>
+            )}
 
             {/* 3D Dimensional Extruded & Tilting Text with responsive font-size */}
             <span className="animated-3d-text text-sm min-[380px]:text-base sm:text-lg md:text-xl text-white font-extrabold tracking-wider">

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { ArrowUp, Check, Copy, ShieldCheck } from 'lucide-react';
 import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useAdmin } from '../context/AdminContext';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 
 export default function Footer() {
   const { isAdmin, openAccessModal } = useAdmin();
+  const { settings } = useSiteSettings();
   const [copiedDiscord, setCopiedDiscord] = useState(false);
 
   const scrollToTop = () => {
@@ -46,8 +48,18 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-12 border-b border-[#1F2833]">
           <div>
-            <span className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight flex items-center gap-2">
-              <span className="w-2.5 h-2.5 bg-[#FF4655] rounded-xs" />
+            <span className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight flex items-center gap-2.5">
+              {settings.faviconUrl ? (
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md overflow-hidden bg-[#0A0E14] border border-[#FF4655]/50 flex items-center justify-center shrink-0 p-0.5 shadow-sm shadow-[#FF4655]/20">
+                  <img
+                    src={settings.faviconUrl}
+                    alt="Brand Favicon"
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <span className="w-2.5 h-2.5 bg-[#FF4655] rounded-xs" />
+              )}
               <span>SAIFY SAMIT</span>
             </span>
             <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] mt-1 block font-semibold">
