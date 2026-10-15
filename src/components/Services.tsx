@@ -4,6 +4,13 @@ import { SERVICES_DATA, ServiceItem } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { savePermanently, loadPermanently, idbRemoveItem } from '../utils/persistentStorage';
+import {
+  subscribeToServices,
+  saveServiceToFirestore,
+  deleteServiceFromFirestore,
+  saveAllServicesToFirestore,
+  seedInitialServicesIfEmpty,
+} from '../firebase';
 
 interface ServicesProps {
   onSelectService?: (service: ServiceItem) => void;
@@ -116,14 +123,27 @@ export default function Services({ onSelectService }: ServicesProps) {
     return SERVICES_DATA;
   });
 
-  // Sync with permanent storage (IndexedDB + LocalStorage) and server database
+  // Sync with Firestore real-time cloud database, permanent local storage, and server database
   useEffect(() => {
-    loadPermanently<ServiceItem[]>('saify_services_custom', SERVICES_DATA).then((loaded) => {
-      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
-        setServicesList(loaded);
+    // 1. Seed initial services if cloud database is empty
+    seedInitialServicesIfEmpty(SERVICES_DATA);
+
+    // 2. Real-time Cloud Synchronization (Instantly updates across Vercel, mobile, and all visitors)
+    const unsubscribe = subscribeToServices((cloudServices) => {
+      if (cloudServices && cloudServices.length > 0) {
+        setServicesList(cloudServices);
+        savePermanently('saify_services_custom', cloudServices);
       }
     });
 
+    // 3. Fallback from permanent local storage
+    loadPermanently<ServiceItem[]>('saify_services_custom', SERVICES_DATA).then((loaded) => {
+      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+        setServicesList((prev) => (prev.length > 0 ? prev : loaded));
+      }
+    });
+
+    // 4. Fallback from server database if available
     fetch('/api/services')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -131,12 +151,26 @@ export default function Services({ onSelectService }: ServicesProps) {
       })
       .then((data) => {
         if (data?.services && Array.isArray(data.services) && data.services.length > 0) {
-          setServicesList(data.services);
+          setServicesList((prev) => (prev.length > 0 ? prev : data.services));
           savePermanently('saify_services_custom', data.services);
         }
       })
       .catch(() => {});
+
+    // 5. Instant UI broadcast listener (for one-click data pack restore)
+    const handleServicesUpdated = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setServicesList(e.detail);
+      }
+    };
+    window.addEventListener('saify_services_updated', handleServicesUpdated);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('saify_services_updated', handleServicesUpdated);
+    };
   }, []);
+
 
   // Modal State for Add & Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -247,8 +281,22 @@ export default function Services({ onSelectService }: ServicesProps) {
     }
 
     setServicesList(updated);
+
+    // 1. Save to Firestore Real-Time Cloud Database (Instant live sync across Vercel and all visitors)
+    if (editingServiceId) {
+      const targetService = updated.find((s) => s.id === editingServiceId);
+      if (targetService) {
+        saveServiceToFirestore(targetService).catch((err) => console.warn('Firestore service save error:', err));
+      }
+    } else if (updated.length > 0) {
+      const newCreated = updated[updated.length - 1];
+      saveServiceToFirestore(newCreated).catch((err) => console.warn('Firestore service save error:', err));
+    }
+
+    // 2. Save to permanent multi-layer storage (IndexedDB + LocalStorage)
     savePermanently('saify_services_custom', updated);
 
+    // 3. Save to server database
     fetch('/api/services', {
       method: 'POST',
       headers: getAdminAuthHeaders(),
@@ -286,8 +334,14 @@ export default function Services({ onSelectService }: ServicesProps) {
       const targetId = deleteConfirm.serviceId;
       const updated = servicesList.filter((s) => s.id !== targetId);
       setServicesList(updated);
+
+      // 1. Delete from Firestore Cloud Database
+      deleteServiceFromFirestore(targetId).catch((err) => console.warn('Firestore service delete error:', err));
+
+      // 2. Save to permanent storage
       savePermanently('saify_services_custom', updated);
 
+      // 3. Sync to server
       fetch('/api/services', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -299,11 +353,17 @@ export default function Services({ onSelectService }: ServicesProps) {
       }
     } else if (deleteConfirm.type === 'reset') {
       setServicesList(SERVICES_DATA);
+
+      // 1. Reset all in Firestore Cloud Database
+      saveAllServicesToFirestore(SERVICES_DATA).catch((err) => console.warn('Firestore services reset error:', err));
+
+      // 2. Reset in permanent storage
       idbRemoveItem('saify_services_custom');
       try {
         localStorage.removeItem('saify_services_custom');
       } catch {}
       savePermanently('saify_services_custom', SERVICES_DATA);
+
       fetch('/api/services/reset', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -318,12 +378,17 @@ export default function Services({ onSelectService }: ServicesProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 sm:mb-16 gap-6">
           <div className="max-w-2xl">
-            <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold mb-3 block">
-              CAPABILITIES & SPECIALIZATIONS
+            <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold mb-3 block flex items-center gap-2">
+              <span>CAPABILITIES & SPECIALIZATIONS</span>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Cloud Synced
+              </span>
             </span>
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-display tracking-tight mb-4">
               Core Design Services
             </h2>
+
             <p className="text-sm sm:text-base text-zinc-400 leading-relaxed">
               Every deliverable is crafted with commercial intent, surgical composition, and production-grade export standards.
             </p>

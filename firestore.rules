@@ -7,6 +7,30 @@ service cloud.firestore {
       allow create, update, delete: if true;
     }
 
+    // Core Design Services (Capabilities & Specializations): anyone can read, updates allowed
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Verified Client Testimonials & Endorsements: anyone can read, updates allowed
+    match /testimonials/{testimonialId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Global Site Settings & Branding
+    match /siteSettings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // Complete Website Data Packs & Cloud Snapshots (One-Click Backup & Restore)
+    match /datapacks/{packId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
     // Hero backgrounds: anyone can read, client updates allowed
     match /heroBackgrounds/{bgId} {
       allow read: if true;
@@ -24,3 +48,4 @@ service cloud.firestore {
     }
   }
 }
+

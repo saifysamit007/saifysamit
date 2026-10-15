@@ -24,6 +24,8 @@ import {
   Mail,
   ExternalLink,
   MessageSquare,
+  Database,
+  FolderDown,
 } from 'lucide-react';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import { useSiteSettings, DEFAULT_FAVICON_SVG } from '../context/SiteSettingsContext';
@@ -32,6 +34,7 @@ import SectionManagerModal from './SectionManagerModal';
 import FaviconModal from './FaviconModal';
 import ThemeCustomizerModal from './ThemeCustomizerModal';
 import Preloader from './Preloader';
+import DataPackModal from './DataPackModal';
 
 export default function AdminAccessModal() {
   const {
@@ -76,6 +79,7 @@ export default function AdminAccessModal() {
     }
   });
   const [showInquiriesModal, setShowInquiriesModal] = useState(false);
+  const [showDataPackModal, setShowDataPackModal] = useState(false);
   const [syncingCode, setSyncingCode] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState(false);
 
@@ -100,6 +104,18 @@ export default function AdminAccessModal() {
       if (savedP) projects = JSON.parse(savedP);
     } catch {}
 
+    let services = [];
+    try {
+      const savedS = localStorage.getItem('saify_services_custom');
+      if (savedS) services = JSON.parse(savedS);
+    } catch {}
+
+    let testimonials = [];
+    try {
+      const savedT = localStorage.getItem('saify_testimonials_custom');
+      if (savedT) testimonials = JSON.parse(savedT);
+    } catch {}
+
     let heroBackgrounds = [];
     try {
       const savedH = localStorage.getItem('saify_hero_bg_images');
@@ -109,10 +125,13 @@ export default function AdminAccessModal() {
     return {
       exportedAt: new Date().toISOString(),
       projects: projects.length > 0 ? projects : null,
+      services: services.length > 0 ? services : null,
+      testimonials: testimonials.length > 0 ? testimonials : null,
       heroBackgrounds: heroBackgrounds.length > 0 ? heroBackgrounds : null,
       siteSettings: settings,
     };
   };
+
 
   const handleSyncToCode = async () => {
     setSyncingCode(true);
@@ -123,9 +142,12 @@ export default function AdminAccessModal() {
         headers: getAdminAuthHeaders(),
         body: JSON.stringify({
           projects: data.projects,
+          services: data.services,
+          testimonials: data.testimonials,
           heroBackgrounds: data.heroBackgrounds,
         }),
       });
+
       if (res.ok) {
         setSyncSuccess(true);
         setTimeout(() => setSyncSuccess(false), 3000);
@@ -342,10 +364,10 @@ export default function AdminAccessModal() {
                     </div>
                     <div>
                       <span className="text-xs font-mono font-bold text-white block">
-                        Browser Tab Favicon
+                        Browser Tab Favicon (ট্যাব আইকন)
                       </span>
                       <span className="text-[10px] text-zinc-400 font-mono">
-                        {settings.faviconUrl ? 'Custom Icon Active' : 'Default Red S Monogram'}
+                        {settings.faviconUrl ? 'Custom Icon Active' : 'Default Red S'} (Navbar & Footer 3D Cube is preserved)
                       </span>
                     </div>
                   </div>
@@ -483,8 +505,49 @@ export default function AdminAccessModal() {
                   </button>
                 </div>
 
+                {/* Website Data Pack & Cloud Backup Hub Card (1-Click Restore System) */}
+                <div className="p-3.5 rounded-xl bg-gradient-to-r from-[#080B0F] via-[#0E141C] to-[#141B24] border border-[#FF4655]/40 space-y-3 shadow-lg shadow-[#FF4655]/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#FF4655]/15 border border-[#FF4655]/30 flex items-center justify-center text-[#FF4655] shrink-0">
+                        <Database className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold text-white block">
+                            Website Data Pack & Cloud Backup Hub
+                          </span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FF4655]/20 text-[#FF4655] border border-[#FF4655]/30">
+                            1-CLICK RESTORE
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-zinc-400 font-mono">
+                          Selected Work, Core Services, Testimonials এর ক্লাউড ব্যাকআপ ও রিস্টোর
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-zinc-300 font-mono leading-relaxed bg-[#080B0F] p-2.5 rounded-lg border border-zinc-800">
+                    💡 <strong>ওয়ান-ক্লিক রিস্টোর:</strong> ওয়েবসাইটে যেকোনো নতুন আপডেট আসলে অথবা আগের ডেটা ফিরে পেতে চাইলে ক্লাউড স্ন্যাপশট থেকে মাত্র ১-ক্লিকে সমস্ত প্রজেক্ট, সার্ভিস ও রিভিউ লাইভ ওয়েবসাইটে রিস্টোর করা যাবে।
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      closeAccessModal();
+                      setShowDataPackModal(true);
+                    }}
+                    className="w-full py-2 px-3 text-xs font-mono font-bold uppercase tracking-wider bg-[#FF4655] hover:bg-[#ff5a68] text-white rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-[#FF4655]/25"
+                  >
+                    <Database className="w-3.5 h-3.5" />
+                    <span>Open Data Pack Hub (১-ক্লিক ব্যাকআপ ও রিস্টোর হাব)</span>
+                  </button>
+                </div>
+
                 {/* Vercel Live Deployment & Data Sync Center */}
                 <div className="p-3.5 rounded-xl bg-[#080B0F] border border-zinc-800 space-y-3">
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded bg-[#16191E] border border-zinc-700 flex items-center justify-center text-[#FF4655] shrink-0">
@@ -807,6 +870,9 @@ export default function AdminAccessModal() {
       {/* Theme & Text/Copy Customizer Modal */}
       <ThemeCustomizerModal />
 
+      {/* Website Complete Data Pack & Cloud Snapshot Modal */}
+      <DataPackModal isOpen={showDataPackModal} onClose={() => setShowDataPackModal(false)} />
+
       {/* Interactive Preloader Animation Preview Triggered by Admin */}
       {showPreloaderPreview && (
         <div className="z-[150] fixed inset-0">
@@ -814,5 +880,6 @@ export default function AdminAccessModal() {
         </div>
       )}
     </>
+
   );
 }

@@ -20,6 +20,13 @@ import { TESTIMONIALS_DATA, TestimonialItem } from '../data/portfolioData';
 import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
 import { savePermanently, loadPermanently, idbRemoveItem, compressImageFile } from '../utils/persistentStorage';
+import {
+  subscribeToTestimonials,
+  saveTestimonialToFirestore,
+  deleteTestimonialFromFirestore,
+  saveAllTestimonialsToFirestore,
+  seedInitialTestimonialsIfEmpty,
+} from '../firebase';
 
 const AVATAR_PRESETS = [
   { label: 'Esports Director', url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80' },
@@ -45,14 +52,27 @@ export default function Testimonials() {
     return TESTIMONIALS_DATA;
   });
 
-  // Sync with permanent storage (IndexedDB + LocalStorage) and server database
+  // Sync with Firestore real-time cloud database, permanent local storage, and server database
   useEffect(() => {
-    loadPermanently<TestimonialItem[]>('saify_testimonials_custom', TESTIMONIALS_DATA).then((loaded) => {
-      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
-        setTestimonialsList(loaded);
+    // 1. Seed initial testimonials if cloud database is empty
+    seedInitialTestimonialsIfEmpty(TESTIMONIALS_DATA);
+
+    // 2. Real-time Cloud Synchronization (Instantly updates across Vercel, mobile, and all visitors)
+    const unsubscribe = subscribeToTestimonials((cloudTestimonials) => {
+      if (cloudTestimonials && cloudTestimonials.length > 0) {
+        setTestimonialsList(cloudTestimonials);
+        savePermanently('saify_testimonials_custom', cloudTestimonials);
       }
     });
 
+    // 3. Fallback from permanent local storage
+    loadPermanently<TestimonialItem[]>('saify_testimonials_custom', TESTIMONIALS_DATA).then((loaded) => {
+      if (loaded && Array.isArray(loaded) && loaded.length > 0) {
+        setTestimonialsList((prev) => (prev.length > 0 ? prev : loaded));
+      }
+    });
+
+    // 4. Fallback from server database if available
     fetch('/api/testimonials')
       .then((res) => {
         const ct = res.headers.get('content-type') || '';
@@ -60,12 +80,26 @@ export default function Testimonials() {
       })
       .then((data) => {
         if (data?.testimonials && Array.isArray(data.testimonials) && data.testimonials.length > 0) {
-          setTestimonialsList(data.testimonials);
+          setTestimonialsList((prev) => (prev.length > 0 ? prev : data.testimonials));
           savePermanently('saify_testimonials_custom', data.testimonials);
         }
       })
       .catch(() => {});
+
+    // 5. Instant UI broadcast listener (for one-click data pack restore)
+    const handleTestimonialsUpdated = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setTestimonialsList(e.detail);
+      }
+    };
+    window.addEventListener('saify_testimonials_updated', handleTestimonialsUpdated);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('saify_testimonials_updated', handleTestimonialsUpdated);
+    };
   }, []);
+
 
   // Modal State for Add & Edit
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -191,8 +225,21 @@ export default function Testimonials() {
     }
 
     setTestimonialsList(updated);
+
+    // 1. Save to Firestore Real-Time Cloud Database (Instant live sync across Vercel and all visitors)
+    if (editingTestimonialId) {
+      const targetItem = updated.find((t) => t.id === editingTestimonialId);
+      if (targetItem) {
+        saveTestimonialToFirestore(targetItem).catch((err) => console.warn('Firestore testimonial save error:', err));
+      }
+    } else if (updated.length > 0) {
+      saveTestimonialToFirestore(updated[0]).catch((err) => console.warn('Firestore testimonial save error:', err));
+    }
+
+    // 2. Save to permanent multi-layer storage (IndexedDB + LocalStorage)
     savePermanently('saify_testimonials_custom', updated);
 
+    // 3. Save to server database
     fetch('/api/testimonials', {
       method: 'POST',
       headers: getAdminAuthHeaders(),
@@ -230,8 +277,14 @@ export default function Testimonials() {
       const targetId = deleteConfirm.testimonialId;
       const updated = testimonialsList.filter((t) => t.id !== targetId);
       setTestimonialsList(updated);
+
+      // 1. Delete from Firestore Cloud Database
+      deleteTestimonialFromFirestore(targetId).catch((err) => console.warn('Firestore testimonial delete error:', err));
+
+      // 2. Save to permanent storage
       savePermanently('saify_testimonials_custom', updated);
 
+      // 3. Sync to server
       fetch('/api/testimonials', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -243,11 +296,17 @@ export default function Testimonials() {
       }
     } else if (deleteConfirm.type === 'reset') {
       setTestimonialsList(TESTIMONIALS_DATA);
+
+      // 1. Reset all in Firestore Cloud Database
+      saveAllTestimonialsToFirestore(TESTIMONIALS_DATA).catch((err) => console.warn('Firestore testimonials reset error:', err));
+
+      // 2. Reset in permanent storage
       idbRemoveItem('saify_testimonials_custom');
       try {
         localStorage.removeItem('saify_testimonials_custom');
       } catch {}
       savePermanently('saify_testimonials_custom', TESTIMONIALS_DATA);
+
       fetch('/api/testimonials/reset', {
         method: 'POST',
         headers: getAdminAuthHeaders(),
@@ -256,6 +315,7 @@ export default function Testimonials() {
 
     setDeleteConfirm(null);
   };
+
 
   const getPlatformBadge = (platform: string, username?: string) => {
     const p = (platform || '').toLowerCase();
@@ -423,12 +483,17 @@ export default function Testimonials() {
       `}</style>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-10 text-center">
-        <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold mb-3 block">
-          CLIENT ENDORSEMENTS & VERIFIED IMPACT
+        <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] font-bold mb-3 inline-flex items-center justify-center gap-2">
+          <span>CLIENT ENDORSEMENTS & VERIFIED IMPACT</span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Live Cloud Synced
+          </span>
         </span>
         <h2 className="text-3xl sm:text-5xl font-extrabold text-white font-display tracking-tight mb-3">
           Client Testimonials
         </h2>
+
         <p className="text-sm sm:text-base text-zinc-400 max-w-xl mx-auto leading-relaxed mb-5">
           Direct feedback and verified reviews received across commercial commissions, WhatsApp, Instagram, and web inquiries.
         </p>

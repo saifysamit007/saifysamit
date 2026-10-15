@@ -126,42 +126,42 @@ function syncHeroBackgroundsToSourceCode(backgrounds: any[]) {
   }
 }
 
-function syncFaviconToHtml(faviconUrl: string | null) {
+function syncServicesToSourceCode(services: any[]) {
   try {
-    const indexPath = path.resolve(process.cwd(), 'index.html');
-    if (!fs.existsSync(indexPath)) return;
-    let html = fs.readFileSync(indexPath, 'utf8');
+    const portfolioFilePath = path.resolve(process.cwd(), 'src/data/portfolioData.ts');
+    if (!fs.existsSync(portfolioFilePath)) return;
+    let content = fs.readFileSync(portfolioFilePath, 'utf8');
 
-    const defaultSvg = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0e14'/><path d='M10 23V9h4.5a4.5 4.5 0 0 1 3.2 1.3A4.5 4.5 0 0 1 19 13.5c0 1.2-.4 2.2-1.2 3A4.5 4.5 0 0 1 21 20.5c0 1.3-.5 2.4-1.4 3.3-.9.9-2 1.2-3.3 1.2H10zm3-8.5h1.8c.6 0 1.1-.2 1.5-.6.4-.4.6-.9.6-1.4 0-.6-.2-1.1-.6-1.5-.4-.4-.9-.5-1.5-.5H13v4zm0 6h2.2c.7 0 1.3-.2 1.7-.7.4-.4.7-1 .7-1.6 0-.6-.2-1.2-.7-1.6-.4-.4-1-.7-1.7-.7H13v4.6z' fill='%23FF4655'/></svg>";
-    const target = faviconUrl && faviconUrl.trim() ? faviconUrl.trim() : defaultSvg;
-    const clean = target.split('?')[0].split('#')[0].toLowerCase();
-
-    let mime = 'image/png';
-    if (clean.endsWith('.svg') || target.startsWith('data:image/svg')) {
-      mime = 'image/svg+xml';
-    } else if (clean.endsWith('.ico')) {
-      mime = 'image/x-icon';
-    } else if (clean.endsWith('.webp')) {
-      mime = 'image/webp';
-    } else if (clean.endsWith('.jpg') || clean.endsWith('.jpeg')) {
-      mime = 'image/jpeg';
+    const regex = /export const SERVICES_DATA: ServiceItem\[\] = \[([\s\S]*?)\];/;
+    if (regex.test(content)) {
+      const serialized = JSON.stringify(services, null, 2);
+      content = content.replace(regex, `export const SERVICES_DATA: ServiceItem[] = ${serialized};`);
+      fs.writeFileSync(portfolioFilePath, content, 'utf8');
+      console.log('✓ Successfully synced services to src/data/portfolioData.ts for Vercel/GitHub');
     }
-
-    const faviconRegex = /<link\s+(?:id=["']app-favicon["']\s+)?rel=["'](?:shortcut\s+)?icon["'][\s\S]*?>/i;
-    const newTag = `<link id="app-favicon" rel="icon" type="${mime}" href="${target}" />`;
-
-    if (faviconRegex.test(html)) {
-      html = html.replace(faviconRegex, newTag);
-    } else {
-      html = html.replace('</head>', `  ${newTag}\n  </head>`);
-    }
-
-    fs.writeFileSync(indexPath, html, 'utf8');
-    console.log('✓ Successfully synced favicon to index.html for Vercel/GitHub');
   } catch (err) {
-    console.error('Failed to sync favicon to index.html:', err);
+    console.error('Failed to sync services to portfolioData.ts:', err);
   }
 }
+
+function syncTestimonialsToSourceCode(testimonials: any[]) {
+  try {
+    const portfolioFilePath = path.resolve(process.cwd(), 'src/data/portfolioData.ts');
+    if (!fs.existsSync(portfolioFilePath)) return;
+    let content = fs.readFileSync(portfolioFilePath, 'utf8');
+
+    const regex = /export const TESTIMONIALS_DATA: TestimonialItem\[\] = \[([\s\S]*?)\];/;
+    if (regex.test(content)) {
+      const serialized = JSON.stringify(testimonials, null, 2);
+      content = content.replace(regex, `export const TESTIMONIALS_DATA: TestimonialItem[] = ${serialized};`);
+      fs.writeFileSync(portfolioFilePath, content, 'utf8');
+      console.log('✓ Successfully synced testimonials to src/data/portfolioData.ts for Vercel/GitHub');
+    }
+  } catch (err) {
+    console.error('Failed to sync testimonials to portfolioData.ts:', err);
+  }
+}
+
 
 function initDb(): DatabaseSchema {
   let data: any = {};
@@ -541,10 +541,18 @@ app.post('/api/hero-backgrounds', requireAdminAuth, (req, res) => {
 // Universal Sync-to-Code API (Ensures Vercel static build & GitHub have latest admin edits)
 app.post('/api/sync-to-code', requireAdminAuth, (req, res) => {
   try {
-    const { projects, heroBackgrounds } = req.body;
+    const { projects, services, testimonials, heroBackgrounds } = req.body;
     if (Array.isArray(projects)) {
       db.projects = projects;
       syncProjectsToSourceCode(projects);
+    }
+    if (Array.isArray(services)) {
+      db.services = services;
+      syncServicesToSourceCode(services);
+    }
+    if (Array.isArray(testimonials)) {
+      db.testimonials = testimonials;
+      syncTestimonialsToSourceCode(testimonials);
     }
     if (Array.isArray(heroBackgrounds)) {
       db.heroBackgrounds = heroBackgrounds;
@@ -559,6 +567,7 @@ app.post('/api/sync-to-code', requireAdminAuth, (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Inquiries REST API (Stores inquiries for admin review)
 app.get('/api/inquiries', requireAdminAuth, (req, res) => {
@@ -755,7 +764,6 @@ app.post('/api/site-settings', requireAdminAuth, (req, res) => {
       db.siteSettings = updated;
       if (updated.faviconUrl !== undefined) {
         db.faviconUrl = updated.faviconUrl;
-        syncFaviconToHtml(updated.faviconUrl);
       }
       saveDb(db);
       return res.json({ success: true, settings: updated });
@@ -783,8 +791,7 @@ app.post('/api/favicon', requireAdminAuth, (req, res) => {
         db.siteSettings.faviconUrl = cleanUrl;
       }
       saveDb(db);
-      syncFaviconToHtml(cleanUrl);
-      return res.json({ success: true, faviconUrl: cleanUrl, syncedToHtml: true });
+      return res.json({ success: true, faviconUrl: cleanUrl });
     }
     res.status(400).json({ error: 'Invalid favicon image payload' });
   } catch (err: any) {
@@ -798,7 +805,6 @@ app.post('/api/favicon/reset', requireAdminAuth, (req, res) => {
     db.siteSettings.faviconUrl = null;
   }
   saveDb(db);
-  syncFaviconToHtml(null);
   res.json({ success: true, message: 'Favicon reset to default' });
 });
 

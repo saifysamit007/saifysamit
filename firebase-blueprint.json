@@ -28,6 +28,58 @@
       },
       "required": ["id", "title", "thumbnail"]
     },
+    "Service": {
+      "title": "Service",
+      "description": "Core design capability and specialization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "index": { "type": "string" },
+        "title": { "type": "string" },
+        "tagline": { "type": "string" },
+        "description": { "type": "string" },
+        "toolsUsed": { "type": "array" },
+        "deliverables": { "type": "array" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "description"]
+    },
+    "Testimonial": {
+      "title": "Testimonial",
+      "description": "Verified client endorsement and review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientName": { "type": "string" },
+        "role": { "type": "string" },
+        "companyOrTeam": { "type": "string" },
+        "projectScope": { "type": "string" },
+        "platform": { "type": "string" },
+        "platformUsername": { "type": "string" },
+        "rating": { "type": "number" },
+        "avatar": { "type": "string" },
+        "quote": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "clientName", "quote"]
+    },
+    "DataPack": {
+      "title": "DataPack",
+      "description": "Full website state backup snapshot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "version": { "type": "string" },
+        "projects": { "type": "array" },
+        "services": { "type": "array" },
+        "testimonials": { "type": "array" },
+        "siteSettings": { "type": "object" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "createdAt", "projects", "services", "testimonials"]
+    },
     "HeroBackground": {
       "title": "HeroBackground",
       "description": "Hero background media item",
@@ -60,6 +112,22 @@
     "/projects/{projectId}": {
       "schema": { "$ref": "#/entities/Project" },
       "description": "Collection of commercial portfolio projects"
+    },
+    "/services/{serviceId}": {
+      "schema": { "$ref": "#/entities/Service" },
+      "description": "Collection of core design services and capabilities"
+    },
+    "/testimonials/{testimonialId}": {
+      "schema": { "$ref": "#/entities/Testimonial" },
+      "description": "Collection of verified client testimonials and endorsements"
+    },
+    "/datapacks/{packId}": {
+      "schema": { "$ref": "#/entities/DataPack" },
+      "description": "Collection of full website backup snapshots"
+    },
+    "/siteSettings/{settingId}": {
+      "schema": { "type": "object" },
+      "description": "Global website configuration and styling settings"
     },
     "/heroBackgrounds/{bgId}": {
       "schema": { "$ref": "#/entities/HeroBackground" },

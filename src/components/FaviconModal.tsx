@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   Zap,
 } from 'lucide-react';
-import { useAdmin, getAdminAuthHeaders } from '../context/AdminContext';
+import { useAdmin } from '../context/AdminContext';
 import { useSiteSettings, DEFAULT_FAVICON_SVG } from '../context/SiteSettingsContext';
 
 interface FaviconPreset {
@@ -84,10 +84,7 @@ export default function FaviconModal() {
   const [previewUrl, setPreviewUrl] = useState<string>(
     settings.faviconUrl || DEFAULT_FAVICON_SVG
   );
-  const [activeTab, setActiveTab] = useState<'url' | 'upload' | 'presets' | 'guidelines'>('url');
-  const [urlInput, setUrlInput] = useState<string>(
-    settings.faviconUrl && !settings.faviconUrl.startsWith('data:') ? settings.faviconUrl : ''
-  );
+  const [activeTab, setActiveTab] = useState<'upload' | 'presets' | 'guidelines'>('upload');
   const [themePreviewMode, setThemePreviewMode] = useState<'both' | 'dark' | 'light'>('both');
   const [isApplying, setIsApplying] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(
@@ -102,38 +99,6 @@ export default function FaviconModal() {
   }>({});
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleUrlChange = (newUrl: string) => {
-    setUrlInput(newUrl);
-    const trimmed = newUrl.trim();
-    if (!trimmed) {
-      setPreviewUrl(DEFAULT_FAVICON_SVG);
-      setFeedbackMsg(null);
-      return;
-    }
-    setPreviewUrl(trimmed);
-    const img = new Image();
-    img.onload = () => {
-      const isSquare = img.naturalWidth === img.naturalHeight;
-      setImageMeta({
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-        format: trimmed.split('.').pop()?.split('?')[0].toUpperCase() || 'IMAGE',
-        isSquare,
-      });
-      setFeedbackMsg({
-        type: 'success',
-        text: `✓ Image verified (${img.naturalWidth}×${img.naturalHeight}px)! Ready to set as Favicon & Brand Emblem everywhere.`,
-      });
-    };
-    img.onerror = () => {
-      setFeedbackMsg({
-        type: 'error',
-        text: 'Could not load image from this URL. Please ensure it is a direct image link (e.g. ImageKit).',
-      });
-    };
-    img.src = trimmed;
-  };
 
   if (!isAdmin || !isFaviconModalOpen) {
     return null;
@@ -226,20 +191,11 @@ export default function FaviconModal() {
     setIsApplying(true);
     setFeedbackMsg(null);
     try {
-      const targetUrl = activeTab === 'url' && urlInput.trim() ? urlInput.trim() : previewUrl;
-      const ok = await updateFavicon(targetUrl);
-
-      // Also notify server to update db and index.html
-      fetch('/api/favicon', {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-        body: JSON.stringify({ faviconUrl: targetUrl }),
-      }).catch(() => {});
-
+      const ok = await updateFavicon(previewUrl);
       if (ok) {
         setFeedbackMsg({
           type: 'success',
-          text: '✓ Favicon updated live across browser tab, Navbar, and Footer!',
+          text: 'Favicon updated live! Check your browser tab at the top of your screen.',
         });
         setTimeout(() => {
           closeFaviconModal();
@@ -265,12 +221,7 @@ export default function FaviconModal() {
     try {
       await resetFavicon();
       setPreviewUrl(DEFAULT_FAVICON_SVG);
-      setUrlInput('');
       setImageMeta({});
-      fetch('/api/favicon/reset', {
-        method: 'POST',
-        headers: getAdminAuthHeaders(),
-      }).catch(() => {});
       setFeedbackMsg({
         type: 'success',
         text: 'Favicon successfully reset to default Saify Samit Red S monogram.',
@@ -302,14 +253,14 @@ export default function FaviconModal() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 id="favicon-modal-title" className="text-base sm:text-lg font-bold text-white font-display">
-                  Website Favicon & Browser Tab Branding
+                  Browser Tab Favicon
                 </h2>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FF4655]/20 text-[#FF4655] border border-[#FF4655]/40 font-bold uppercase">
-                  Admin Tool
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-bold uppercase">
+                  Tab Icon Only
                 </span>
               </div>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Upload or customize the browser tab icon with live Dark & Light theme rendering previews
+                Customize your browser tab icon only (The 3D rotating cube in your Navbar and Footer is 100% preserved)
               </p>
             </div>
           </div>
@@ -322,6 +273,28 @@ export default function FaviconModal() {
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Permanent 3D Cube Emblem Preservation Reassurance Banner */}
+        <div className="px-4 sm:px-6 py-2.5 bg-[#080B0F] border-b border-zinc-800 flex items-center justify-between gap-3 text-xs font-mono">
+          <div className="flex items-center gap-2.5 text-zinc-300">
+            <div className="cube-container-3d scale-75" aria-hidden="true">
+              <div className="cube-3d">
+                <div className="cube-face cube-face-front" />
+                <div className="cube-face cube-face-back" />
+                <div className="cube-face cube-face-right" />
+                <div className="cube-face cube-face-left" />
+                <div className="cube-face cube-face-top" />
+                <div className="cube-face cube-face-bottom" />
+              </div>
+            </div>
+            <span className="text-[11px] text-zinc-300">
+              <strong className="text-white font-semibold">Permanent Live Emblem:</strong> The 3D rotating isometric cube on your live website is permanently active and will never be replaced.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 hidden sm:inline-block">
+            Favicon Tool
+          </span>
         </div>
 
         {/* Scrollable Center Content */}
@@ -526,60 +499,12 @@ export default function FaviconModal() {
                 </div>
               </div>
             </div>
-
-            {/* Live Website Navbar & Footer Emblem Preview */}
-            <div className="p-3.5 rounded-xl bg-[#0E131A] border border-zinc-800 space-y-2.5">
-              <span className="text-xs font-mono font-bold uppercase text-white flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-[#FF4655]" />
-                Live Website Navbar & Footer Brand Emblem Preview
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {/* Navbar Preview */}
-                <div className="p-3 rounded-lg bg-[#080B0F] border border-zinc-700/80 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg overflow-hidden bg-[#0A0E14] border border-[#FF4655]/60 flex items-center justify-center p-0.5 shadow-sm shadow-[#FF4655]/20">
-                      <img src={previewUrl} alt="Navbar Logo" className="w-full h-full object-contain" />
-                    </div>
-                    <span className="text-xs font-extrabold text-white font-display tracking-wider">
-                      SAIFY SAMIT
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-400">In Navbar</span>
-                </div>
-
-                {/* Footer Preview */}
-                <div className="p-3 rounded-lg bg-[#080B0F] border border-zinc-700/80 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-6 h-6 rounded-md overflow-hidden bg-[#0A0E14] border border-[#FF4655]/50 flex items-center justify-center p-0.5 shadow-sm shadow-[#FF4655]/20">
-                      <img src={previewUrl} alt="Footer Logo" className="w-full h-full object-contain" />
-                    </div>
-                    <span className="text-xs font-extrabold text-white font-display tracking-wider">
-                      SAIFY SAMIT
-                    </span>
-                  </div>
-                  <span className="text-[10px] font-mono text-zinc-400">In Footer</span>
-                </div>
-              </div>
-            </div>
           </div>
 
-          {/* SECTION 2: TABS (Direct URL / Upload / Presets / Detailed Guidelines) */}
+          {/* SECTION 2: TABS (Upload / Presets / Detailed Guidelines) */}
           <div className="space-y-4">
             {/* Tab Buttons */}
-            <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800 pb-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('url')}
-                className={`px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer flex items-center gap-2 ${
-                  activeTab === 'url'
-                    ? 'bg-[#FF4655] text-white shadow-md shadow-[#FF4655]/30'
-                    : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
-                }`}
-              >
-                <Globe className="w-3.5 h-3.5" />
-                <span>Image Link / ImageKit URL</span>
-              </button>
-
+            <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
               <button
                 type="button"
                 onClick={() => setActiveTab('upload')}
@@ -603,7 +528,7 @@ export default function FaviconModal() {
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>Presets ({PRESETS.length})</span>
+                <span>Professional Presets ({PRESETS.length})</span>
               </button>
 
               <button
@@ -616,62 +541,9 @@ export default function FaviconModal() {
                 }`}
               >
                 <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-                <span>Format Guidelines</span>
+                <span>Format & Pixel Guidelines</span>
               </button>
             </div>
-
-            {/* TAB CONTENT: DIRECT IMAGE / IMAGEKIT URL */}
-            {activeTab === 'url' && (
-              <div className="space-y-4 animate-in fade-in duration-200">
-                <div className="p-4 sm:p-5 rounded-2xl bg-[#0E141B] border border-zinc-800 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-mono font-bold uppercase text-white tracking-wider flex items-center gap-2">
-                      <Globe className="w-4 h-4 text-[#FF4655]" />
-                      Direct Favicon / Logo Image URL (ImageKit, Imgur, Web URL):
-                    </label>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded font-bold">
-                      IMAGEKIT READY
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="url"
-                      value={urlInput}
-                      onChange={(e) => handleUrlChange(e.target.value)}
-                      placeholder="https://ik.imagekit.io/pc5amjyab/logo.png"
-                      className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-[#FF4655] rounded-lg px-3.5 py-2.5 text-xs font-mono text-white placeholder-zinc-500 focus:outline-none"
-                    />
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleUrlChange(urlInput)}
-                        className="px-4 py-2 bg-[#FF4655] hover:bg-[#ff5a68] text-xs font-mono font-bold uppercase text-white rounded-lg transition-colors cursor-pointer shadow-md shadow-[#FF4655]/20"
-                      >
-                        Load Link
-                      </button>
-                      {urlInput && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUrlInput('');
-                            setPreviewUrl(DEFAULT_FAVICON_SVG);
-                            setFeedbackMsg(null);
-                          }}
-                          className="px-3 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono text-zinc-300 rounded-lg transition-colors cursor-pointer"
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-[#080B0F] border border-[#1F2833] text-[11px] font-mono text-zinc-300 leading-relaxed">
-                    💡 <strong>ImageKit বা যেকোনো লিঙ্ক পেস্ট করুন:</strong> এখানে লিঙ্ক দিয়ে নিচে <span className="text-[#FF4655] font-semibold">"Apply Favicon (Live)"</span> বাটনে ক্লিক করলেই এই ছবিটি আপনার ব্রাউজার ট্যাবের আইকন হিসেবে এবং ওয়েবসাইটের Navbar ও Footer-এর ব্র্যান্ড লোগো হিসেবে সরাসরি কার্যকর হবে।
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* TAB CONTENT 1: UPLOAD */}
             {activeTab === 'upload' && (
@@ -704,6 +576,33 @@ export default function FaviconModal() {
 
                   <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 text-[11px] font-mono text-zinc-400 border border-zinc-800">
                     <span>Recommended: 64 × 64 px or 128 × 128 px (Square 1:1)</span>
+                  </div>
+                </div>
+
+                {/* Direct Image URL or Data URL input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono uppercase text-zinc-400 tracking-wider">
+                    Or Enter Direct Favicon Image URL / SVG Code:
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={previewUrl.startsWith('data:') ? 'Custom Data URL / Uploaded File' : previewUrl}
+                      onChange={(e) => {
+                        if (!e.target.value.startsWith('Custom Data')) {
+                          setPreviewUrl(e.target.value);
+                        }
+                      }}
+                      placeholder="https://example.com/favicon.png"
+                      className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-zinc-600 focus:outline-none focus:border-[#FF4655]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="px-3.5 py-2 bg-zinc-800 hover:bg-zinc-700 text-xs font-mono font-semibold text-white rounded-lg transition-colors cursor-pointer"
+                    >
+                      Browse
+                    </button>
                   </div>
                 </div>
 

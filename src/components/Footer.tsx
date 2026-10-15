@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { ArrowUp, Check, Copy, ShieldCheck } from 'lucide-react';
 import { ARTIST_PROFILE } from '../data/portfolioData';
 import { useAdmin } from '../context/AdminContext';
-import { useSiteSettings } from '../context/SiteSettingsContext';
 
 export default function Footer() {
   const { isAdmin, openAccessModal } = useAdmin();
-  const { settings } = useSiteSettings();
   const [copiedDiscord, setCopiedDiscord] = useState(false);
 
   const scrollToTop = () => {
@@ -48,18 +46,18 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 pb-12 border-b border-[#1F2833]">
           <div>
-            <span className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight flex items-center gap-2.5">
-              {settings.faviconUrl ? (
-                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-md overflow-hidden bg-[#0A0E14] border border-[#FF4655]/50 flex items-center justify-center shrink-0 p-0.5 shadow-sm shadow-[#FF4655]/20">
-                  <img
-                    src={settings.faviconUrl}
-                    alt="Brand Favicon"
-                    className="w-full h-full object-contain"
-                  />
+            <span className="text-xl sm:text-2xl font-extrabold text-white font-display tracking-tight flex items-center gap-3">
+              {/* 3D Rotating Isometric Cube (Permanent Signature Emblem) */}
+              <div className="cube-container-3d scale-90" aria-hidden="true">
+                <div className="cube-3d">
+                  <div className="cube-face cube-face-front" />
+                  <div className="cube-face cube-face-back" />
+                  <div className="cube-face cube-face-right" />
+                  <div className="cube-face cube-face-left" />
+                  <div className="cube-face cube-face-top" />
+                  <div className="cube-face cube-face-bottom" />
                 </div>
-              ) : (
-                <span className="w-2.5 h-2.5 bg-[#FF4655] rounded-xs" />
-              )}
+              </div>
               <span>SAIFY SAMIT</span>
             </span>
             <span className="text-xs font-mono uppercase tracking-widest text-[#FF4655] mt-1 block font-semibold">

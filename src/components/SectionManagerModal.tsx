@@ -168,10 +168,10 @@ export default function SectionManagerModal() {
               </div>
               <div>
                 <span className="text-xs font-mono font-bold text-white block">
-                  Website Favicon & Browser Tab Branding
+                  Browser Tab Favicon (ট্যাব আইকন)
                 </span>
                 <span className="text-[10px] text-zinc-400 font-mono">
-                  Custom icon with live Dark/Light theme previews & pixel guidelines
+                  Custom icon for browser tab (Navbar & Footer 3D Rotating Cube is preserved)
                 </span>
               </div>
             </div>
